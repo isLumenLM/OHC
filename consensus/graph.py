@@ -6,9 +6,10 @@
 import math
 from collections import defaultdict
 from enum import Enum
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union, Optional, Dict
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 import networkx as nx
 from matplotlib import pyplot as plt
@@ -49,6 +50,7 @@ class DynamicDiscussionGraph:
         """
         self._graphs: List[nx.Graph] = []
         self._timestamp: List[datetime] = []
+        self._root: Optional[int] = None
 
         if nodes is not None and edges is not None:
             self.add_graphs(nodes, edges)
@@ -60,8 +62,19 @@ class DynamicDiscussionGraph:
         if isinstance(nodes[0][1], str):
             nodes = [(node_id, datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S'), weight) for
                      node_id, node_type, timestamp, weight in nodes]
-        unique_timestamps = sorted(set(timestamp for _, _, timestamp, _, _ in nodes))
-        for timestamp in unique_timestamps:
+
+        unique_timestamps = set()
+        roots = set()
+        for node_id, node_type, timestamp, weight, text in nodes:
+            unique_timestamps.add(timestamp)
+            if node_type == NodeType.ROOT:
+                roots.add(node_id)
+        if len(roots) >= 2:
+            raise ValueError("Two or more root nodes")
+        else:
+            self._root = roots.pop()
+
+        for timestamp in sorted(unique_timestamps):
             nodes_at_timestamp = [(node_id, node_type, ts, weight, text)
                                   for node_id, node_type, ts, weight, text in nodes
                                   if ts <= timestamp]
@@ -71,12 +84,12 @@ class DynamicDiscussionGraph:
                                   if src in valid_nodes_at_timestamp and dst in valid_nodes_at_timestamp]
 
             if nodes_at_timestamp and edges_at_timestamp:
-                self.add_graph(timestamp, nodes_at_timestamp, edges_at_timestamp)
+                self._add_graph(timestamp, nodes_at_timestamp, edges_at_timestamp)
 
-    def add_graph(self,
-                  timestamp: datetime,
-                  nodes: List[Tuple[int, NodeType, Union[datetime, str], int, str]],
-                  edges: List[Tuple[int, int, EdgeType]]):
+    def _add_graph(self,
+                   timestamp: datetime,
+                   nodes: List[Tuple[int, NodeType, Union[datetime, str], int, str]],
+                   edges: List[Tuple[int, int, EdgeType]]):
         g = nx.Graph()
         nodes_with_attrs = [(node, {'type': node_type, 'timestamp': timestamp, 'weight': weight, 'text': text}) for
                             node, node_type, timestamp, weight, text in nodes]
@@ -88,7 +101,7 @@ class DynamicDiscussionGraph:
         self._timestamp.append(timestamp)
 
     @staticmethod
-    def _calculate_consensus(graph: nx.Graph, root: int):
+    def _calculate_consensus(graph: nx.Graph, root: int) -> Dict[int, float]:
         consensus = {node: 0 for node in graph.nodes}
         visited = set()
 
@@ -116,9 +129,43 @@ class DynamicDiscussionGraph:
 
         return consensus
 
-    def get_consensus(self, node_type: NodeType.IDEA):
+    def get_consensus(self, node_type: NodeType = NodeType.IDEA):
+        self._check_graphs()
+
+        for g in self._graphs:
+            all_nodes_consensus = self._calculate_consensus(g, self._root)
+            target_nodes = [i for i in g.nodes if g.nodes[i].get('type') == node_type]
+            target_nodes_consensus = {i: all_nodes_consensus[i] for i in target_nodes}
+            print(target_nodes_consensus)
+
+    @staticmethod
+    def _calculate_skewness(arr: Union[List, np.ndarray]) -> float:
+        if isinstance(arr, List):
+            arr = np.array(arr)
+
+        n = len(arr)
+        if n < 3:
+            return 0
+
+        mean = np.mean(arr)
+        deviations = arr - mean
+        cubed_deviations = deviations ** 3
+        squared_deviations = deviations ** 2
+        sum_cubed_deviations = np.sum(cubed_deviations)
+        sum_squared_deviations = np.sum(squared_deviations)
+        adj_factor = np.sqrt(n * (n - 1)) / (n - 2)
+
+        skewness = (adj_factor * (1.0 / n * sum_cubed_deviations)) / ((1.0 / n * sum_squared_deviations) ** 1.5)
+
+        return skewness
+
+
+
+
+
+    def _check_graphs(self):
         if not self._graphs:
-            raise ValueError("empty graphs, please add nodes and edges using method 'add_graph()' or 'add_graphs()'")
+            raise ValueError("empty graphs, please add nodes and edges using method 'add_graphs()'")
 
     def load_graphs_from_df(self, df: pd.DataFrame) -> 'DynamicDiscussionGraph':
         pass
@@ -249,5 +296,4 @@ if __name__ == '__main__':
     #          (1, 5, EdgeType.SUPPORT), (5, 6, EdgeType.OPPOSE)]
     ddg.add_graphs(nodes, edges)
     ddg.draw()
-    for g in ddg.graphs:
-        print(ddg._calculate_consensus(g, 0))
+    ddg.get_consensus()
