@@ -7,6 +7,7 @@ import json
 import time
 
 from spider.house086 import post_parse
+from consensus.graph import DynamicDiscussionGraph
 
 pid = 292368
 
@@ -37,11 +38,10 @@ def wrap_text(text: str, limit: int):
     wrapped_text += current_line.strip()
     return wrapped_text
 
-
 init_json = read_json('init.json')
-posts = post_parse(pid)
+posts = post_parse(pid, delay=[0, 0])
 children = []
-
+replytimes = []
 for idx, post in enumerate(posts):
     if idx == 0:
         init_json['data']['root']['data']['text'] = (
@@ -56,8 +56,12 @@ for idx, post in enumerate(posts):
             },
             "children": []
         })
+    replytimes.append(post.get('replytime'))
 
 init_json['data']['root']['children'] = children
 init_json = json.dumps(init_json, ensure_ascii=False)
 with open(f'{pid}.json', 'w', encoding='utf-8') as f:
     f.write(init_json)
+
+print(replytimes)
+print(DynamicDiscussionGraph.time_binning(replytimes, 'D', 3, draw=True))

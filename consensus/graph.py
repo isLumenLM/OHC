@@ -18,8 +18,6 @@ import matplotlib as mpl
 mpl.rcParams['font.sans-serif'] = ['SimHei']
 mpl.rcParams['axes.unicode_minus'] = False
 
-DATETIME_MIN = '0001-01-01 00:00:00'
-
 
 class EdgeType(Enum):
     ROOT_CONNECTION = 'root_connection'
@@ -57,11 +55,13 @@ class DynamicDiscussionGraph:
 
     def add_graphs(self,
                    nodes: List[Tuple[int, NodeType, Union[datetime, str], int, str]],
-                   edges: List[Tuple[int, int, EdgeType]]):
+                   edges: List[Tuple[int, int, EdgeType]],
+                   granularity: str = 'D',
+                   number: int = 1):
 
-        if isinstance(nodes[0][1], str):
-            nodes = [(node_id, datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S'), weight) for
-                     node_id, node_type, timestamp, weight in nodes]
+        if isinstance(nodes[0][2], str):
+            nodes = [(node_id, node_type, datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S'), weight, text) for
+                     node_id, node_type, timestamp, weight, text in nodes]
 
         unique_timestamps = set()
         roots = set()
@@ -74,17 +74,19 @@ class DynamicDiscussionGraph:
         else:
             self._root = roots.pop()
 
-        for timestamp in sorted(unique_timestamps):
+        unique_timestamps = [datetime.strftime(timestamp, '%Y-%m-%d %H:%M:%S') for timestamp in sorted(unique_timestamps)]
+        time_bins = self.time_binning(unique_timestamps, granularity, number)
+        for start_time, end_time in time_bins:
             nodes_at_timestamp = [(node_id, node_type, ts, weight, text)
                                   for node_id, node_type, ts, weight, text in nodes
-                                  if ts <= timestamp]
+                                  if ts < end_time]
             valid_nodes_at_timestamp = set(node_id for node_id, _, _, _, _ in nodes_at_timestamp)
             edges_at_timestamp = [(src, dst, edge_type)
                                   for src, dst, edge_type in edges
                                   if src in valid_nodes_at_timestamp and dst in valid_nodes_at_timestamp]
 
             if nodes_at_timestamp and edges_at_timestamp:
-                self._add_graph(timestamp, nodes_at_timestamp, edges_at_timestamp)
+                self._add_graph(start_time, nodes_at_timestamp, edges_at_timestamp)
 
     def _add_graph(self,
                    timestamp: datetime,
@@ -129,14 +131,26 @@ class DynamicDiscussionGraph:
 
         return consensus
 
-    def get_consensus(self, node_type: NodeType = NodeType.IDEA):
+    def get_consensus(self, node_type: NodeType = NodeType.IDEA) -> List[Dict[int, float]]:
         self._check_graphs()
 
+        graphs_consensus = []
         for g in self._graphs:
             all_nodes_consensus = self._calculate_consensus(g, self._root)
             target_nodes = [i for i in g.nodes if g.nodes[i].get('type') == node_type]
             target_nodes_consensus = {i: all_nodes_consensus[i] for i in target_nodes}
-            print(target_nodes_consensus)
+            graphs_consensus.append(target_nodes_consensus)
+
+        return graphs_consensus
+
+    def get_skewness(self, node_type: NodeType = NodeType.IDEA, draw: bool = True) -> List[float]:
+        graphs_consensus = self.get_consensus(node_type)
+        graphs_skewness = [self._calculate_skewness(list(consensus.values())) for consensus in graphs_consensus]
+        if draw:
+            plt.plot(graphs_skewness)
+            plt.show()
+
+        return graphs_skewness
 
     @staticmethod
     def _calculate_skewness(arr: Union[List, np.ndarray]) -> float:
@@ -239,6 +253,60 @@ class DynamicDiscussionGraph:
             plt.tight_layout()
             plt.show()
 
+    @staticmethod
+    def time_binning(time_list: List[str], granularity: str = 'D', number: int = 1, draw: bool = False):
+        """
+        对时间列表进行分箱。
+
+        :param time_list: 时间字符串的列表。
+        :param granularity: 分箱的粒度，可以是'D', 'W', 或 'Y'。
+        :param number: 分箱的数量。
+        :return: 每个分箱的起始和结束时间（左闭右开）。
+        """
+        # 将时间字符串转换为datetime objects
+        times = pd.to_datetime(time_list)
+
+        # 根据粒度设置时间偏移
+        if granularity == 'D':
+            offset = pd.DateOffset(days=number)
+        elif granularity == 'W':
+            offset = pd.DateOffset(weeks=number)
+        elif granularity == 'Y':
+            offset = pd.DateOffset(years=number)
+        else:
+            raise ValueError("Granularity must be 'D', 'W', or 'Y'.")
+
+        # 创建分箱的起始时间列表
+        start_time = times.min()
+        end_time = times.max()
+        bin_edges = [start_time]
+        while bin_edges[-1] <= end_time:
+            bin_edges.append(bin_edges[-1] + offset)
+
+        # 计算每个时间点落在哪个分箱中
+        time_bins = pd.cut(times, bins=bin_edges, right=False)
+        bin_counts = time_bins.value_counts().sort_index()
+
+        if draw:
+            # 绘制折线图和柱状图
+            fig, ax = plt.subplots()
+
+            ax.set_xlabel('Time Bins')
+            ax.set_ylabel('Count', color='tab:red')
+            ax.bar(bin_counts.index.categories.left, bin_counts, color='tab:red', alpha=0.6, label='Count')
+            ax.tick_params(axis='y', labelcolor='tab:red')
+
+            ax.plot(bin_counts.index.categories.left, bin_counts, color='tab:blue', marker="o", label='Count (Line)')
+            ax.tick_params(axis='y', labelcolor='tab:blue')
+
+            fig.tight_layout()  # 调整整体空白
+            fig.autofmt_xdate()
+            plt.xticks(rotation=45)
+            plt.show()
+
+        # 返回分箱的起始和结束时间
+        return [(bin.left, bin.right) for bin in bin_counts.index]
+
     @property
     def graphs(self) -> List[nx.Graph]:
         return self._graphs
@@ -249,7 +317,7 @@ class DynamicDiscussionGraph:
 
 if __name__ == '__main__':
     ddg = DynamicDiscussionGraph()
-    nodes = [(0, NodeType.ROOT, DATETIME_MIN, 0, '求助'),
+    nodes = [(0, NodeType.ROOT, '2017-09-06 00:00:00', 0, '求助'),
              (1, NodeType.IDEA, '2017-09-06 00:00:00', 3, '多跑几家医院多问几个医生'),
              (2, NodeType.ARGUMENTATION, '2017-09-07 00:00:00', 2, '好的！跑了好几家了，说是先化疗'),
              (3, NodeType.ARGUMENTATION, '2017-09-12 00:00:00', 4, '多上网看看'),
@@ -261,7 +329,7 @@ if __name__ == '__main__':
              (8, NodeType.ARGUMENTATION, '2017-09-11 00:00:00', 2,
               '19.20突变，是黄金突变，首先应该用易瑞沙或者凯美纳，9291为后者'),
              (9, NodeType.ARGUMENTATION, '2017-09-12 00:00:00', 3, '有突变化疗的效果可能不好，还是从一代的易特开始吧'),
-             (10, NodeType.ARGUMENTATION, '2017-09-09', 2, '是啊，毕竟这个副作用很小而且效果明显'),
+             (10, NodeType.ARGUMENTATION, '2017-09-09 00:00:00', 2, '是啊，毕竟这个副作用很小而且效果明显'),
              (11, NodeType.IDEA, '2017-09-16 00:00:00', 3, '化疗，进行复敏，加油'),
              (12, NodeType.IDEA, '2017-09-08 00:00:00', 2, '谢谢，我也打算从易瑞沙开始吃'),
              (13, NodeType.ARGUMENTATION, '2017-09-14 00:00:00', 4, '现在吃易瑞沙呢'),
@@ -292,4 +360,5 @@ if __name__ == '__main__':
     #          (1, 5, EdgeType.SUPPORT), (5, 6, EdgeType.OPPOSE)]
     ddg.add_graphs(nodes, edges)
     ddg.draw()
-    ddg.get_consensus()
+    print(ddg.get_consensus())
+    print(ddg.get_skewness())
