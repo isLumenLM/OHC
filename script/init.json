@@ -1,0 +1,21 @@
+{
+    "id": "fh_1711442001793",
+    "created_at": 0,
+    "updated_at": 0,
+    "title": "中心主题",
+    "data": {
+        "root": {
+            "data": {
+                "id": "0",
+                "created": 0,
+                "text": "中心主题"
+            },
+            "children": [
+
+            ]
+        },
+        "template": "default",
+        "theme": "fresh-blue",
+        "version": "1.4.43"
+    }
+}

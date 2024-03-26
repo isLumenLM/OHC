@@ -159,10 +159,6 @@ class DynamicDiscussionGraph:
 
         return skewness
 
-
-
-
-
     def _check_graphs(self):
         if not self._graphs:
             raise ValueError("empty graphs, please add nodes and edges using method 'add_graphs()'")
