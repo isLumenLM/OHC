@@ -3,6 +3,7 @@
 # @Author  : LiuMing
 # @Email   : liuming04073@zulong.com
 # @File    : graph.py
+import json
 import math
 from collections import defaultdict
 from enum import Enum
@@ -38,7 +39,9 @@ class NodeType(Enum):
 class DynamicDiscussionGraph:
     def __init__(self,
                  nodes: List[Tuple[int, NodeType, Union[datetime, str], int, str]] = None,
-                 edges: List[Tuple[int, int, EdgeType]] = None):
+                 edges: List[Tuple[int, int, EdgeType]] = None,
+                 granularity: str = 'D',
+                 number: int = 1):
         """
         nodes format: Tuple[node_id, node_type, timestamp, user_weight, text], for instance:
                         [(1, NodeType.IDEA, '2022-01-01', 2, 'text1'),
@@ -51,7 +54,7 @@ class DynamicDiscussionGraph:
         self._root: Optional[int] = None
 
         if nodes is not None and edges is not None:
-            self.add_graphs(nodes, edges)
+            self.add_graphs(nodes, edges, granularity, number)
 
     def add_graphs(self,
                    nodes: List[Tuple[int, NodeType, Union[datetime, str], int, str]],
@@ -69,6 +72,7 @@ class DynamicDiscussionGraph:
             unique_timestamps.add(timestamp)
             if node_type == NodeType.ROOT:
                 roots.add(node_id)
+
         if len(roots) >= 2:
             raise ValueError("Two or more root nodes")
         else:
@@ -177,8 +181,66 @@ class DynamicDiscussionGraph:
         if not self._graphs:
             raise ValueError("empty graphs, please add nodes and edges using method 'add_graphs()'")
 
-    def load_graphs_from_df(self, df: pd.DataFrame) -> 'DynamicDiscussionGraph':
-        pass
+    def load_graphs_from_json(self, json_path: str,
+                              granularity: str = 'D',
+                              number: int = 1) -> 'DynamicDiscussionGraph':
+        with open(json_path, 'r', encoding='utf-8') as file:
+            data = json.load(file).get('data')
+
+        # 递归遍历节点的函数
+        def dfs(node, parent_id=None):
+            node_id = node['data']['id']
+            text = node['data']['text']
+            replytime = node['data']['replytime']
+            resource = node['data'].get('resource', [])
+
+            if parent_id is None:  # 根节点没有 parent_id
+                node_type = NodeType.ROOT
+            else:
+                if len(resource) == 1 and '主意' in resource:
+                    node_type = NodeType.IDEA
+                elif len(resource) == 2 and '论证' in resource:
+                    node_type = NodeType.ARGUMENTATION
+                elif len(resource) == 2 and '疑问' in resource:
+                    node_type = NodeType.QUESTION
+                elif len(resource) == 2 and '资料' in resource:
+                    node_type = NodeType.INFORMATION
+                else:
+                    raise ValueError
+
+            # TODO 用户权重
+            nodes.append((node_id, node_type, replytime, 1, text))
+
+            if parent_id is not None:
+                if len(resource) == 2 and '支持' in resource:
+                    edge_type = EdgeType.SUPPORT
+                elif len(resource) == 2 and '反对' in resource:
+                    edge_type = EdgeType.OPPOSE
+                elif len(resource) == 2 and '补充' in resource:
+                    edge_type = EdgeType.SUPPLY
+                elif len(resource) == 2 and '质疑' in resource:
+                    edge_type = EdgeType.DISPUTE
+                elif len(resource) == 1 and '主意' in resource:
+                    edge_type = EdgeType.ROOT_CONNECTION
+                else:
+                    raise ValueError
+
+                edges.append((parent_id, node_id, edge_type))
+
+            # 递归遍历子节点
+            for child in node.get('children', []):
+                dfs(child, parent_id=node_id)
+
+        nodes = []
+        edges = []
+
+        # 从根节点开始递归遍历
+        dfs(data['root'])
+
+        # 使用 add_graphs 添加图形
+        self.add_graphs(nodes, edges, granularity, number)
+
+        return self
 
     def _draw_graph(self, index: int):
         G = self._graphs[index]
@@ -225,6 +287,7 @@ class DynamicDiscussionGraph:
         nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
 
     def draw(self, index: Optional[int] = None):
+        self._check_graphs()
         if index is not None:
             self._draw_graph(index)
             plt.show()
@@ -258,23 +321,29 @@ class DynamicDiscussionGraph:
         """
         对时间列表进行分箱。
 
+
         :param time_list: 时间字符串的列表。
-        :param granularity: 分箱的粒度，可以是'D', 'W', 或 'Y'。
+        :param granularity: 分箱的粒度，可以是'H', 'D', 'W', 'M', 或 'Y'。
         :param number: 分箱的数量。
+        :param draw: 是否画图。
         :return: 每个分箱的起始和结束时间（左闭右开）。
         """
         # 将时间字符串转换为datetime objects
         times = pd.to_datetime(time_list)
 
         # 根据粒度设置时间偏移
-        if granularity == 'D':
+        if granularity == 'H':
+            offset = pd.DateOffset(hours=number)
+        elif granularity == 'D':
             offset = pd.DateOffset(days=number)
         elif granularity == 'W':
             offset = pd.DateOffset(weeks=number)
+        elif granularity == 'M':
+            offset = pd.DateOffset(months=number)
         elif granularity == 'Y':
             offset = pd.DateOffset(years=number)
         else:
-            raise ValueError("Granularity must be 'D', 'W', or 'Y'.")
+            raise ValueError("Granularity must be 'H', 'D', 'W', 'M', or 'Y'.")
 
         # 创建分箱的起始时间列表
         start_time = times.min()
@@ -293,8 +362,8 @@ class DynamicDiscussionGraph:
 
             ax.set_xlabel('Time Bins')
             ax.set_ylabel('Count', color='tab:red')
-            ax.bar(bin_counts.index.categories.left, bin_counts, color='tab:red', alpha=0.6, label='Count')
-            ax.tick_params(axis='y', labelcolor='tab:red')
+            # ax.bar(bin_counts.index.categories.left, bin_counts, color='tab:red', alpha=0.6, label='Count')
+            # ax.tick_params(axis='y', labelcolor='tab:red')
 
             ax.plot(bin_counts.index.categories.left, bin_counts, color='tab:blue', marker="o", label='Count (Line)')
             ax.tick_params(axis='y', labelcolor='tab:blue')
@@ -317,37 +386,37 @@ class DynamicDiscussionGraph:
 
 if __name__ == '__main__':
     ddg = DynamicDiscussionGraph()
-    nodes = [(0, NodeType.ROOT, '2017-09-06 00:00:00', 0, '求助'),
-             (1, NodeType.IDEA, '2017-09-06 00:00:00', 3, '多跑几家医院多问几个医生'),
-             (2, NodeType.ARGUMENTATION, '2017-09-07 00:00:00', 2, '好的！跑了好几家了，说是先化疗'),
-             (3, NodeType.ARGUMENTATION, '2017-09-12 00:00:00', 4, '多上网看看'),
-             (4, NodeType.IDEA, '2017-09-06 00:00:00', 5, '搞清楚为什么直接9291，不考虑一代TKI'),
-             (5, NodeType.ARGUMENTATION, '2017-09-07 00:00:00', 3,
-              '要谨慎，如果从9291起，一旦耐药，目前来讲可选择的靶向药不是很多，正常的顺序都是从一代靶向药吃起'),
-             (6, NodeType.ARGUMENTATION, '2017-09-08 00:00:00', 2, '我准备先吃靶向药，穿插进行化疗，进行复敏'),
-             (7, NodeType.ARGUMENTATION, '2017-09-09 00:00:00', 4, '有基因突变患者，靶向为一线方案为佳，这得到多数认可'),
-             (8, NodeType.ARGUMENTATION, '2017-09-11 00:00:00', 2,
-              '19.20突变，是黄金突变，首先应该用易瑞沙或者凯美纳，9291为后者'),
-             (9, NodeType.ARGUMENTATION, '2017-09-12 00:00:00', 3, '有突变化疗的效果可能不好，还是从一代的易特开始吧'),
-             (10, NodeType.ARGUMENTATION, '2017-09-09 00:00:00', 2, '是啊，毕竟这个副作用很小而且效果明显'),
-             (11, NodeType.IDEA, '2017-09-16 00:00:00', 3, '化疗，进行复敏，加油'),
-             (12, NodeType.IDEA, '2017-09-08 00:00:00', 2, '谢谢，我也打算从易瑞沙开始吃'),
-             (13, NodeType.ARGUMENTATION, '2017-09-14 00:00:00', 4, '现在吃易瑞沙呢'),
-             (14, NodeType.ARGUMENTATION, '2017-09-16 00:00:00', 3, '首先应该用易瑞沙')]
-    edges = [(0, 1, EdgeType.ROOT_CONNECTION),
-             (1, 2, EdgeType.SUPPORT),
-             (1, 3, EdgeType.SUPPLY),
-             (0, 4, EdgeType.ROOT_CONNECTION),
-             (4, 5, EdgeType.SUPPORT),
-             (4, 6, EdgeType.SUPPLY),
-             (4, 7, EdgeType.SUPPORT),
-             (4, 8, EdgeType.SUPPORT),
-             (4, 9, EdgeType.SUPPORT),
-             (7, 10, EdgeType.SUPPORT),
-             (0, 11, EdgeType.ROOT_CONNECTION),
-             (0, 12, EdgeType.ROOT_CONNECTION),
-             (12, 13, EdgeType.SUPPORT),
-             (13, 14, EdgeType.SUPPORT)]
+    # nodes = [(0, NodeType.ROOT, '2017-09-06 00:00:00', 0, '求助'),
+    #          (1, NodeType.IDEA, '2017-09-06 00:00:00', 3, '多跑几家医院多问几个医生'),
+    #          (2, NodeType.ARGUMENTATION, '2017-09-07 00:00:00', 2, '好的！跑了好几家了，说是先化疗'),
+    #          (3, NodeType.ARGUMENTATION, '2017-09-12 00:00:00', 4, '多上网看看'),
+    #          (4, NodeType.IDEA, '2017-09-06 00:00:00', 5, '搞清楚为什么直接9291，不考虑一代TKI'),
+    #          (5, NodeType.ARGUMENTATION, '2017-09-07 00:00:00', 3,
+    #           '要谨慎，如果从9291起，一旦耐药，目前来讲可选择的靶向药不是很多，正常的顺序都是从一代靶向药吃起'),
+    #          (6, NodeType.ARGUMENTATION, '2017-09-08 00:00:00', 2, '我准备先吃靶向药，穿插进行化疗，进行复敏'),
+    #          (7, NodeType.ARGUMENTATION, '2017-09-09 00:00:00', 4, '有基因突变患者，靶向为一线方案为佳，这得到多数认可'),
+    #          (8, NodeType.ARGUMENTATION, '2017-09-11 00:00:00', 2,
+    #           '19.20突变，是黄金突变，首先应该用易瑞沙或者凯美纳，9291为后者'),
+    #          (9, NodeType.ARGUMENTATION, '2017-09-12 00:00:00', 3, '有突变化疗的效果可能不好，还是从一代的易特开始吧'),
+    #          (10, NodeType.ARGUMENTATION, '2017-09-09 00:00:00', 2, '是啊，毕竟这个副作用很小而且效果明显'),
+    #          (11, NodeType.IDEA, '2017-09-16 00:00:00', 3, '化疗，进行复敏，加油'),
+    #          (12, NodeType.IDEA, '2017-09-08 00:00:00', 2, '谢谢，我也打算从易瑞沙开始吃'),
+    #          (13, NodeType.ARGUMENTATION, '2017-09-14 00:00:00', 4, '现在吃易瑞沙呢'),
+    #          (14, NodeType.ARGUMENTATION, '2017-09-16 00:00:00', 3, '首先应该用易瑞沙')]
+    # edges = [(0, 1, EdgeType.ROOT_CONNECTION),
+    #          (1, 2, EdgeType.SUPPORT),
+    #          (1, 3, EdgeType.SUPPLY),
+    #          (0, 4, EdgeType.ROOT_CONNECTION),
+    #          (4, 5, EdgeType.SUPPORT),
+    #          (4, 6, EdgeType.SUPPLY),
+    #          (4, 7, EdgeType.SUPPORT),
+    #          (4, 8, EdgeType.SUPPORT),
+    #          (4, 9, EdgeType.SUPPORT),
+    #          (7, 10, EdgeType.SUPPORT),
+    #          (0, 11, EdgeType.ROOT_CONNECTION),
+    #          (0, 12, EdgeType.ROOT_CONNECTION),
+    #          (12, 13, EdgeType.SUPPORT),
+    #          (13, 14, EdgeType.SUPPORT)]
     # nodes = [(1, NodeType.IDEA, '2016-03-27 00:00:00', 3, '直接上9291把'),
     #          (2, NodeType.ARGUMENTATION, '2016-03-30 00:00:00', 2, '9291肯定是放到最后一个考虑关键是有误脑转要搞清楚'),
     #          (3, NodeType.ARGUMENTATION, '2016-04-02 00:00:00', 3, '4002/9291/3759什么的，现在肯定不考虑'),
@@ -358,7 +427,8 @@ if __name__ == '__main__':
     #           '群里人一般都建议暂不把9291用上，好药留后面，是怕耐药了没有后续药，所以拖时间')]
     # edges = [(1, 2, EdgeType.OPPOSE), (1, 3, EdgeType.OPPOSE), (1, 4, EdgeType.SUPPORT),
     #          (1, 5, EdgeType.SUPPORT), (5, 6, EdgeType.OPPOSE)]
-    ddg.add_graphs(nodes, edges)
+    # ddg.add_graphs(nodes, edges)
+    ddg.load_graphs_from_json('../script/292870_annotation.json', 'H', 1)
     ddg.draw()
     print(ddg.get_consensus())
     print(ddg.get_skewness())

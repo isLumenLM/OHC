@@ -76,7 +76,7 @@ def post_parse(pid: int, delay: Optional[List[int]] = None):
                 posttext = ''.join([i.get().strip() for i in posttext[0].xpath(regx)])
 
             regx = '//div[@id="postlist"]/div[starts-with(@id, "post_")][1]/@id'
-            rid = selector.xpath(regx).get()
+            rid = selector.xpath(regx).get().split('_')[1]
 
             user_parse(uid)
 
@@ -97,7 +97,7 @@ def post_parse(pid: int, delay: Optional[List[int]] = None):
             if page == 1 and i == 0:
                 continue
 
-            regx = './/td[@class="plc"]/div[@class="pi"]/strong/a/em/text()'
+            regx = './/td[@class="plc"]/div[@class="pi"]/strong/a/text()'
             floor = r.xpath(regx).get()
             if not floor:
                 continue
@@ -144,4 +144,4 @@ def post_parse(pid: int, delay: Optional[List[int]] = None):
 
 
 if __name__ == '__main__':
-    print(post_parse(253889))
+    print(post_parse(292870), [0, 0])

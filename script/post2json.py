@@ -9,7 +9,7 @@ import time
 from spider.house086 import post_parse
 from consensus.graph import DynamicDiscussionGraph
 
-pid = 292368
+pid = 292870
 
 
 def read_json(json_path: str) -> dict:
@@ -38,21 +38,36 @@ def wrap_text(text: str, limit: int):
     wrapped_text += current_line.strip()
     return wrapped_text
 
+
 init_json = read_json('init.json')
 posts = post_parse(pid, delay=[0, 0])
 children = []
 replytimes = []
 for idx, post in enumerate(posts):
     if idx == 0:
-        init_json['data']['root']['data']['text'] = (
-            f"【时间】：{post.get('replytime')}\n【作者】：{post.get('uname')}\n【文本内容】：{post.get('text')[0:20]}")
+
+        init_json['data']['root']['data'] = {
+            'id': post.get('rid'),
+            'created': int(time.time() * 1000),
+            'text': (f"【rid】：{post.get('rid')}\n"
+                     f"【时间】：{post.get('replytime')}\n"
+                     f"【作者】：{post.get('uname')}\n"
+                     f"【文本内容】：{post.get('text')[0:20]}"),
+            'replytime': post.get('replytime'),
+            'rid': post.get('rid')
+        }
     else:
         children.append({
             'data': {
-                "id": idx + 1,
+                "id": post.get('rid'),
                 "created": int(time.time() * 1000),
-                "text": f"【时间】：{post.get('replytime')}\n【作者】：{post.get('uname')}\n【文本内容】：{wrap_text(post.get('text'), 30)}",
-                "resource": ["主意", "论证", "疑问", "信息", "支持", "反对", "补充", "疑问"]
+                "text": (f"【rid】：{post.get('rid')}\n"
+                         f"【时间】：{post.get('replytime')}\n"
+                         f"【作者】：{post.get('uname')}\n"
+                         f"【文本内容】：{wrap_text(post.get('text'), 30)}"),
+                "resource": ["主意", "论证", "疑问", "资料", "支持", "反对", "补充", "质疑"],
+                'replytime': post.get('replytime'),
+                'rid': post.get('rid')
             },
             "children": []
         })
@@ -64,4 +79,4 @@ with open(f'{pid}.json', 'w', encoding='utf-8') as f:
     f.write(init_json)
 
 print(replytimes)
-print(DynamicDiscussionGraph.time_binning(replytimes, 'D', 3, draw=True))
+print(DynamicDiscussionGraph.time_binning(replytimes, 'H', 1, draw=True))
