@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2024/3/25 10:46
-# @Author  : LiuMing
-# @Email   : liuming04073@zulong.com
+# @Author  : Lumen
 # @File    : graph.py
 import json
 import math
@@ -428,7 +427,7 @@ if __name__ == '__main__':
     # edges = [(1, 2, EdgeType.OPPOSE), (1, 3, EdgeType.OPPOSE), (1, 4, EdgeType.SUPPORT),
     #          (1, 5, EdgeType.SUPPORT), (5, 6, EdgeType.OPPOSE)]
     # ddg.add_graphs(nodes, edges)
-    ddg.load_graphs_from_json('../script/292870_annotation.json', 'H', 1)
+    ddg.load_graphs_from_json('../script/47513_labeled.json', 'H', 1)
     ddg.draw()
     print(ddg.get_consensus())
     print(ddg.get_skewness())

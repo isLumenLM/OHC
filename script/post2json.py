@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2024/3/26 17:14
-# @Author  : LiuMing
-# @Email   : liuming04073@zulong.com
+# @Author  : Lumen
 # @File    : post2json.py
 import json
 import time
@@ -9,7 +8,7 @@ import time
 from spider.house086 import post_parse
 from consensus.graph import DynamicDiscussionGraph
 
-pid = 292870
+pid = 47513
 
 
 def read_json(json_path: str) -> dict:
@@ -79,4 +78,4 @@ with open(f'{pid}.json', 'w', encoding='utf-8') as f:
     f.write(init_json)
 
 print(replytimes)
-print(DynamicDiscussionGraph.time_binning(replytimes, 'H', 1, draw=True))
+print(DynamicDiscussionGraph.time_binning(replytimes, 'M', 1, draw=True))

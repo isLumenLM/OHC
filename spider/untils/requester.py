@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2022/7/18 11:18
-# @Author  : LiuMing
-# @Email   : liuming04073@zulong.com
+# @Author  : Lumen
 # @File    : http.py
 from typing import Dict, Optional, List
 import time
