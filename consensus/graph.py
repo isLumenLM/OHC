@@ -150,7 +150,9 @@ class DynamicDiscussionGraph:
         graphs_consensus = self.get_consensus(node_type)
         graphs_skewness = [self._calculate_skewness(list(consensus.values())) for consensus in graphs_consensus]
         if draw:
-            plt.plot(graphs_skewness)
+            plt.plot(graphs_skewness, marker="o")
+            plt.xlabel("时间点")
+            plt.ylabel("偏度")
             plt.show()
 
         return graphs_skewness

@@ -2,6 +2,7 @@
 # @Time    : 2024/4/16 15:17
 # @Author  : Lumen
 # @File    : tmjy.py
+import os
 import re
 from datetime import datetime
 from io import BytesIO
@@ -73,6 +74,8 @@ def login(username: str, password: str) -> requests.Session:
     )
     if "欢迎您回来" in response.text:
         print("登录成功！")
+        if not os.path.exists('seccode/'):
+            os.makedirs('seccode/')
         with open(f"seccode/{seccodeverify}.jpg", "wb") as img_file:
             img_file.write(img_content)
         return session

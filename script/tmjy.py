@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2024/4/16 15:44
 # @Author  : Lumen
-# @File    : tmjy_to_json.py
+# @File    : tmjy.py
 
 import os
 from configparser import ConfigParser

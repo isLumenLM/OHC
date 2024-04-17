@@ -33,7 +33,8 @@ class PostManager(metaclass=abc.ABCMeta):
     def _check(self):
         if self.pid is None:
             print("请先切换到一个帖子。")
-            return
+            return False
+        return True
 
     def switch_post(self):
         try:
@@ -63,7 +64,8 @@ class PostManager(metaclass=abc.ABCMeta):
         webbrowser.open('https://www.baidufe.com/fehelper/naotu/index.html')
 
     def view_post_counts(self):
-        self._check()
+        if not self._check():
+            return
         reply_times = [post.get('replytime') for post in self.posts]
         print(f"发帖时间：{reply_times[0]}")
         print(f"最后回复时间：{reply_times[-1]}")
@@ -82,8 +84,8 @@ class PostManager(metaclass=abc.ABCMeta):
         pprint(time_bins)
 
     def calculate_skewness_and_consensus(self):
-        # TODO
-        self._check()
+        if not self._check():
+            return
 
         print("可选时间粒度：")
         print("1.小时：H")
@@ -102,8 +104,10 @@ class PostManager(metaclass=abc.ABCMeta):
             granularity=granularity,
             number=number
         )
-        ddg.get_consensus()
-        ddg.get_skewness(draw=True)
+        print(ddg.get_consensus())
+        ddg.draw()
+        skewness = ddg.get_skewness(draw=True)
+        pd.DataFrame([skewness]).to_csv(os.path.join(self.work_path, f'{self.pid}/{self.pid}_skewness.csv'), index=False)
 
     def prompt_user(self):
         while True:
