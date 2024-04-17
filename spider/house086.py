@@ -4,7 +4,7 @@
 # @File    : house086.py
 import re
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 import requests
 from lxml import etree
@@ -19,7 +19,7 @@ def user_parse(uid: str, delay: Optional[List[int]] = None):
     pass
 
 
-def post_parse(pid: int, delay: Optional[List[int]] = None):
+def post_parse(pid: int, delay: Optional[List[int]] = None) -> List[Dict]:
     if delay is None:
         delay = [1, 3]
 
@@ -141,6 +141,3 @@ def post_parse(pid: int, delay: Optional[List[int]] = None):
 
     return posts
 
-
-if __name__ == '__main__':
-    print(post_parse(292870), [0, 0])

@@ -1,44 +1,17 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2024/3/26 17:14
 # @Author  : Lumen
-# @File    : post2json.py
+# @File    : house086_to_json.py
 import json
 import time
 
+from script.utils import read_json, wrap_text
 from spider.house086 import post_parse
 from consensus.graph import DynamicDiscussionGraph
 
 pid = 47513
 
-
-def read_json(json_path: str) -> dict:
-    with open(json_path, 'r', encoding='utf-8') as file:
-        data = json.load(file)
-    timestamp = int(time.time() * 1000)
-
-    if data['created_at'] == 0:
-        data['created_at'] = timestamp
-        data['data']['root']['data']['created'] = timestamp
-
-    data['updated_at'] = timestamp
-
-    return data
-
-
-def wrap_text(text: str, limit: int):
-    wrapped_text = ""
-    current_line = ""
-    for word in text:
-        if len(current_line) + len(word) <= limit:
-            current_line += word
-        else:
-            wrapped_text += current_line.strip() + "\n"
-            current_line = word
-    wrapped_text += current_line.strip()
-    return wrapped_text
-
-
-init_json = read_json('init.json')
+init_json = read_json('config/init.json')
 posts = post_parse(pid, delay=[0, 0])
 children = []
 replytimes = []

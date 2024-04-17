@@ -192,6 +192,7 @@ class DynamicDiscussionGraph:
             text = node['data']['text']
             replytime = node['data']['replytime']
             resource = node['data'].get('resource', [])
+            user_weight = node['data']['user_weight']
 
             if parent_id is None:  # 根节点没有 parent_id
                 node_type = NodeType.ROOT
@@ -207,8 +208,7 @@ class DynamicDiscussionGraph:
                 else:
                     raise ValueError
 
-            # TODO 用户权重
-            nodes.append((node_id, node_type, replytime, 1, text))
+            nodes.append((node_id, node_type, replytime, user_weight, text))
 
             if parent_id is not None:
                 if len(resource) == 2 and '支持' in resource:
@@ -319,8 +319,6 @@ class DynamicDiscussionGraph:
     def time_binning(time_list: List[str], granularity: str = 'D', number: int = 1, draw: bool = False):
         """
         对时间列表进行分箱。
-
-
         :param time_list: 时间字符串的列表。
         :param granularity: 分箱的粒度，可以是'H', 'D', 'W', 'M', 或 'Y'。
         :param number: 分箱的数量。
@@ -359,8 +357,8 @@ class DynamicDiscussionGraph:
             # 绘制折线图和柱状图
             fig, ax = plt.subplots()
 
-            ax.set_xlabel('Time Bins')
-            ax.set_ylabel('Count', color='tab:red')
+            ax.set_xlabel('时间')
+            ax.set_ylabel('发帖数量', color='tab:red')
             # ax.bar(bin_counts.index.categories.left, bin_counts, color='tab:red', alpha=0.6, label='Count')
             # ax.tick_params(axis='y', labelcolor='tab:red')
 
@@ -427,7 +425,7 @@ if __name__ == '__main__':
     # edges = [(1, 2, EdgeType.OPPOSE), (1, 3, EdgeType.OPPOSE), (1, 4, EdgeType.SUPPORT),
     #          (1, 5, EdgeType.SUPPORT), (5, 6, EdgeType.OPPOSE)]
     # ddg.add_graphs(nodes, edges)
-    ddg.load_graphs_from_json('../script/47513_labeled.json', 'H', 1)
+    ddg.load_graphs_from_json('../script/292870_annotation.json', 'H', 1)
     ddg.draw()
     print(ddg.get_consensus())
     print(ddg.get_skewness())
