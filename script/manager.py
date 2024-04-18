@@ -52,7 +52,7 @@ class PostManager(metaclass=abc.ABCMeta):
         self._save_init_json()
 
         pd.DataFrame(self.posts).to_csv(
-            os.path.join(self.work_path, f'{self.pid}/{self.pid}.csv'),
+            os.path.join(self.work_path, f'{self.pid}/source.csv'),
             index=False,
             encoding='utf-8_sig',
             sep='\t'
@@ -63,10 +63,22 @@ class PostManager(metaclass=abc.ABCMeta):
     def open_flow():
         webbrowser.open('https://www.baidufe.com/fehelper/naotu/index.html')
 
-    def view_post_counts(self):
+    def view_post_counts(self, labeled: bool = False):
         if not self._check():
             return
-        reply_times = [post.get('replytime') for post in self.posts]
+
+        if labeled:
+            ddg = DynamicDiscussionGraph()
+            ddg.load_graphs_from_json(
+                json_path=os.path.join(self.work_path, f'{self.pid}/labeled.json'),
+                granularity='D',
+                number=1,
+                draw=False
+            )
+            reply_times = ddg.unique_timestamps
+        else:
+            reply_times = [post.get('replytime') for post in self.posts]
+
         print(f"发帖时间：{reply_times[0]}")
         print(f"最后回复时间：{reply_times[-1]}")
 
@@ -95,45 +107,65 @@ class PostManager(metaclass=abc.ABCMeta):
         print("5.年：Y")
         print("例如，以25天进行分箱，时间粒度输入D，周期输入25")
         print("请确定已经标注好数据")
-        print(f"并将已经标注的数据放入{os.path.join(self.work_path, f'{self.pid}/{self.pid}_labeled.json')}")
+        print(f"并将已经标注的数据放入{os.path.join(self.work_path, f'{self.pid}/labeled.json')}")
         granularity = input("请输入时间粒度（'H', 'D', 'W', 'M', 'Y'）：")
         number = int(input("请输入周期（正整数）："))
         ddg = DynamicDiscussionGraph()
         ddg.load_graphs_from_json(
-            json_path=os.path.join(self.work_path, f'{self.pid}/{self.pid}_labeled.json'),
+            json_path=os.path.join(self.work_path, f'{self.pid}/labeled.json'),
             granularity=granularity,
-            number=number
+            number=number,
+            draw=True
         )
-        print(ddg.get_consensus())
         ddg.draw()
+
         skewness = ddg.get_skewness(draw=True)
-        pd.DataFrame([skewness]).to_csv(os.path.join(self.work_path, f'{self.pid}/{self.pid}_skewness.csv'), index=False)
+        pd.DataFrame([skewness]).to_csv(
+            os.path.join(self.work_path, f'{self.pid}/skewness.csv'),
+            index=False,
+            encoding='utf-8_sig'
+        )
+
+        time_bins = ddg.time_binning(ddg.unique_timestamps, granularity=granularity, number=number, draw=False)
+        consensus = pd.DataFrame(ddg.get_consensus()).fillna(0)
+        consensus['开始时间'] = [t1 for t1, t2 in time_bins]
+        consensus['结束时间'] = [t2 for t1, t2 in time_bins]
+        consensus = consensus.set_index(['开始时间', '结束时间'])
+        consensus.to_csv(os.path.join(self.work_path, f'{self.pid}/consensus.csv'), encoding='utf-8_sig')
 
     def prompt_user(self):
         while True:
+            print('\n\n')
+            print("=" * 30)
             print(f"目前正在处理的帖子id: {self.pid}")
             print("请选择功能：")
             print("1. 切换帖子")
             print("2. 打开脑图")
-            print("3. 查看时间分箱后的帖子数量")
-            print("4. 计算偏度和共识度")
-            print("5. 退出")
+            print("3. 查看时间分箱后的帖子数量（标注前）")
+            print("4. 查看时间分箱后的帖子数量（标注后）")
+            print("5. 计算偏度和共识度（标注后）")
+            print("6. 退出")
 
             choice = input("请输入你的选择（1-5）: ")
 
-            if choice == '1':
-                self.switch_post()
-            elif choice == '2':
-                self.open_flow()
-            elif choice == '3':
-                self.view_post_counts()
-            elif choice == '4':
-                self.calculate_skewness_and_consensus()
-            elif choice == '5':
-                print("退出程序.")
-                break
-            else:
-                print("无效的输入，请重新输入。")
+            try:
+                if choice == '1':
+                    self.switch_post()
+                elif choice == '2':
+                    self.open_flow()
+                elif choice == '3':
+                    self.view_post_counts()
+                elif choice == '4':
+                    self.view_post_counts(labeled=True)
+                elif choice == '5':
+                    self.calculate_skewness_and_consensus()
+                elif choice == '6':
+                    print("退出程序.")
+                    break
+                else:
+                    print("无效的输入，请重新输入。")
+            except Exception as e:
+                print(f"发生错误：{e}")
 
     def _posts_to_json(self, posts):
         self.init_json = self._read_json('config/init.json')
@@ -180,7 +212,7 @@ class PostManager(metaclass=abc.ABCMeta):
 
     def _save_init_json(self):
         init_json = json.dumps(self.init_json, ensure_ascii=False)
-        with open(os.path.join(self.work_path, f'{self.pid}/{self.pid}.json'), 'w', encoding='utf-8') as f:
+        with open(os.path.join(self.work_path, f'{self.pid}/source.json'), 'w', encoding='utf-8') as f:
             f.write(init_json)
 
     @staticmethod

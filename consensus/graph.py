@@ -17,6 +17,7 @@ import matplotlib as mpl
 
 mpl.rcParams['font.sans-serif'] = ['SimHei']
 mpl.rcParams['axes.unicode_minus'] = False
+plt.ion()
 
 
 class EdgeType(Enum):
@@ -51,6 +52,7 @@ class DynamicDiscussionGraph:
         self._graphs: List[nx.Graph] = []
         self._timestamp: List[datetime] = []
         self._root: Optional[int] = None
+        self.unique_timestamps: List[datetime] = []
 
         if nodes is not None and edges is not None:
             self.add_graphs(nodes, edges, granularity, number)
@@ -59,7 +61,8 @@ class DynamicDiscussionGraph:
                    nodes: List[Tuple[int, NodeType, Union[datetime, str], int, str]],
                    edges: List[Tuple[int, int, EdgeType]],
                    granularity: str = 'D',
-                   number: int = 1):
+                   number: int = 1,
+                   draw: bool = False):
 
         if isinstance(nodes[0][2], str):
             nodes = [(node_id, node_type, datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S'), weight, text) for
@@ -77,8 +80,8 @@ class DynamicDiscussionGraph:
         else:
             self._root = roots.pop()
 
-        unique_timestamps = [datetime.strftime(timestamp, '%Y-%m-%d %H:%M:%S') for timestamp in sorted(unique_timestamps)]
-        time_bins = self.time_binning(unique_timestamps, granularity, number)
+        self.unique_timestamps = [datetime.strftime(timestamp, '%Y-%m-%d %H:%M:%S') for timestamp in sorted(unique_timestamps)]
+        time_bins = self.time_binning(self.unique_timestamps, granularity, number, draw)
         for start_time, end_time in time_bins:
             nodes_at_timestamp = [(node_id, node_type, ts, weight, text)
                                   for node_id, node_type, ts, weight, text in nodes
@@ -184,7 +187,8 @@ class DynamicDiscussionGraph:
 
     def load_graphs_from_json(self, json_path: str,
                               granularity: str = 'D',
-                              number: int = 1) -> 'DynamicDiscussionGraph':
+                              number: int = 1,
+                              draw: bool = False) -> 'DynamicDiscussionGraph':
         with open(json_path, 'r', encoding='utf-8') as file:
             data = json.load(file).get('data')
 
@@ -208,7 +212,7 @@ class DynamicDiscussionGraph:
                 elif len(resource) == 2 and '资料' in resource:
                     node_type = NodeType.INFORMATION
                 else:
-                    raise ValueError
+                    raise ValueError("标注有错误，请检查")
 
             nodes.append((node_id, node_type, replytime, user_weight, text))
 
@@ -224,7 +228,7 @@ class DynamicDiscussionGraph:
                 elif len(resource) == 1 and '主意' in resource:
                     edge_type = EdgeType.ROOT_CONNECTION
                 else:
-                    raise ValueError
+                    raise ValueError("标注有错误，请检查")
 
                 edges.append((parent_id, node_id, edge_type))
 
@@ -239,7 +243,7 @@ class DynamicDiscussionGraph:
         dfs(data['root'])
 
         # 使用 add_graphs 添加图形
-        self.add_graphs(nodes, edges, granularity, number)
+        self.add_graphs(nodes, edges, granularity, number, draw)
 
         return self
 
@@ -318,7 +322,7 @@ class DynamicDiscussionGraph:
             plt.show()
 
     @staticmethod
-    def time_binning(time_list: List[str], granularity: str = 'D', number: int = 1, draw: bool = False):
+    def time_binning(time_list: List[Union[str, datetime]], granularity: str = 'D', number: int = 1, draw: bool = False) -> List[Tuple[pd.Timestamp, pd.Timestamp]]:
         """
         对时间列表进行分箱。
         :param time_list: 时间字符串的列表。
@@ -427,7 +431,15 @@ if __name__ == '__main__':
     # edges = [(1, 2, EdgeType.OPPOSE), (1, 3, EdgeType.OPPOSE), (1, 4, EdgeType.SUPPORT),
     #          (1, 5, EdgeType.SUPPORT), (5, 6, EdgeType.OPPOSE)]
     # ddg.add_graphs(nodes, edges)
-    ddg.load_graphs_from_json('../script/292870_annotation.json', 'H', 1)
+    ddg.load_graphs_from_json('../script/data/tmjy/389727634454528/labeled.json', 'D', 1)
     ddg.draw()
     print(ddg.get_consensus())
     print(ddg.get_skewness())
+    time_bins = ddg.time_binning(ddg.unique_timestamps, granularity='D', number=1, draw=True)
+    print(time_bins[0][0])
+    consensus = pd.DataFrame(ddg.get_consensus())
+    consensus['t1'] = [t1 for t1, t2 in time_bins]
+    consensus['t2'] = [t2 for t1, t2 in time_bins]
+    consensus = consensus.set_index(['t1', 't2'])
+    print(consensus)
+

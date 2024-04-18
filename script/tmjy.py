@@ -18,7 +18,7 @@ class TMJYPostManager(PostManager):
 
     def __init__(self):
         super().__init__()
-        self.work_path = 'data/tmjy'
+        self.work_path = 'data/tmjy/'
 
     @staticmethod
     def _convert_user_weight(group: str) -> int:
@@ -58,16 +58,12 @@ class TMJYPostManager(PostManager):
         return user, password
 
     def _crawl_post(self):
-        if os.path.exists(os.path.join(self.work_path, f'{self.pid}/{self.pid}.csv')):
+        if os.path.exists(os.path.join(self.work_path, f'{self.pid}/source.csv')):
             print("检测到本地文件，读取本地文件")
-            df = pd.read_csv(os.path.join(self.work_path, f'{self.pid}/{self.pid}.csv'), sep='\t')
+            df = pd.read_csv(os.path.join(self.work_path, f'{self.pid}/source.csv'), sep='\t')
             self.posts = [row.to_dict() for ind, row in df.iterrows()]
         else:
             self.posts = post_parse(self.pid, self.login_session, delay=[0, 1])
-
-    def _make_data_folder(self):
-        if not os.path.exists(f'data/tmjy/{self.pid}'):
-            os.makedirs(f'data/tmjy/{self.pid}')
 
 
 if __name__ == '__main__':
