@@ -66,7 +66,7 @@ class PostManager(metaclass=abc.ABCMeta):
     def view_post_counts(self, labeled: bool = False):
         if not self._check():
             return
-
+        # TODO
         if labeled:
             ddg = DynamicDiscussionGraph()
             ddg.load_graphs_from_json(
@@ -117,8 +117,9 @@ class PostManager(metaclass=abc.ABCMeta):
             number=number,
             draw=True
         )
-        ddg.draw()
+        # ddg.draw()
 
+        # TODO 偏度值竖的
         skewness = ddg.get_skewness(draw=True)
         pd.DataFrame([skewness]).to_csv(
             os.path.join(self.work_path, f'{self.pid}/skewness.csv'),
@@ -253,7 +254,4 @@ class PostManager(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     def _crawl_post(self):
-        raise NotImplementedError
-
-    def _make_data_folder(self):
         raise NotImplementedError

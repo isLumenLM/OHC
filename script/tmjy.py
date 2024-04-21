@@ -38,6 +38,8 @@ class TMJYPostManager(PostManager):
             return 6
         elif group == '硕士':
             return 7
+
+        # TODO
         elif group == '博士':
             return 9
         elif group in ('版主', '荣誉版主', '特邀嘉宾', '特邀客服'):
