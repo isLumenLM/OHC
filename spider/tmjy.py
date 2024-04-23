@@ -8,11 +8,9 @@ from datetime import datetime
 from io import BytesIO
 from typing import Optional, List, Dict
 from urllib.parse import parse_qs
-import tkinter as tk
-import threading
 
 import requests
-from PIL import Image, ImageTk
+from PIL import Image
 from lxml import etree
 
 from spider.untils import headers
@@ -28,7 +26,7 @@ def login(username: str, password: str) -> requests.Session:
         update = img_params.get('update', [None])[0]
         idhash = img_params.get('idhash', [None])[0]
         response = get(f"https://bbs.tnbz.com/misc.php?mod=seccode&update={update}&idhash={idhash}&mobile=2",
-                       headers={**headers,
+                       headers={**phone_headers,
                                 **{'referer': 'https://bbs.tnbz.com/member.php?mod=logging&action=login&mobile=2'}},
                        session=session)
         image = Image.open(BytesIO(response.content))
@@ -36,15 +34,16 @@ def login(username: str, password: str) -> requests.Session:
 
         return response.content
 
-    headers = {
+    # 手机headers
+    phone_headers = {
         'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36',
     }
+
     session = requests.Session()
 
-    response = get('https://bbs.tnbz.com/member.php?mod=logging&action=login&mobile=2', headers=headers, session=session)
+    response = get('https://bbs.tnbz.com/member.php?mod=logging&action=login&mobile=2', headers=phone_headers, session=session)
     root = etree.HTML(response.text.encode('utf-8'))
     selector = Selector(root=root)
-
     seccodehash = selector.xpath('//input[@name="seccodehash"]/@value').get()
     formhash = selector.xpath('//input[@name="formhash"]/@value').get()
     cookietime = selector.xpath('//input[@name="cookietime"]/@value').get()
@@ -70,7 +69,7 @@ def login(username: str, password: str) -> requests.Session:
     response = session.post(
         url=post_url,
         data=data,
-        headers=headers
+        headers=phone_headers
     )
     if "欢迎您回来" in response.text:
         print("登录成功！")

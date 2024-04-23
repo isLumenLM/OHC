@@ -3,10 +3,7 @@
 # @Author  : Lumen
 # @File    : tmjy.py
 
-import os
 from configparser import ConfigParser
-
-import pandas as pd
 
 import sys
 sys.path.append('..')
@@ -38,14 +35,12 @@ class TMJYPostManager(PostManager):
             return 6
         elif group == '硕士':
             return 7
-
-        # TODO
         elif group == '博士':
-            return 9
+            return 8
         elif group in ('版主', '荣誉版主', '特邀嘉宾', '特邀客服'):
-            return 10
+            return 9
         elif group in ('超级版主', '管理员'):
-            return 11
+            return 10
         else:
             raise ValueError(f'用户组：【{group}】未知，不能转换成权重')
 
@@ -60,10 +55,8 @@ class TMJYPostManager(PostManager):
         return user, password
 
     def _crawl_post(self):
-        if os.path.exists(os.path.join(self.work_path, f'{self.pid}/source.csv')):
-            print("检测到本地文件，读取本地文件")
-            df = pd.read_csv(os.path.join(self.work_path, f'{self.pid}/source.csv'), sep='\t')
-            self.posts = [row.to_dict() for ind, row in df.iterrows()]
+        if self._posts_is_exists():
+            self.posts = self._read_local_posts()
         else:
             self.posts = post_parse(self.pid, self.login_session, delay=[0, 1])
 

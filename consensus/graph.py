@@ -68,6 +68,14 @@ class DynamicDiscussionGraph:
             nodes = [(node_id, node_type, datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S'), weight, text) for
                      node_id, node_type, timestamp, weight, text in nodes]
 
+        # 一个id只能有一个节点
+        if len(set([node_id for node_id, _, _, _, _ in nodes])) != len(nodes):
+            raise ValueError('duplicate node_id')
+
+        # 一个节点只能有一条边
+        if len(nodes) != len(edges) + 1:
+            raise ValueError('There are node connected by multiple edges.')
+
         unique_timestamps = set()
         roots = set()
         for node_id, node_type, timestamp, weight, text in nodes:
@@ -123,12 +131,12 @@ class DynamicDiscussionGraph:
                     continue
                 neighbor_consensus = dfs(neighbor, node)
 
-                if (edge_attr['type'] == EdgeType.SUPPORT
-                        or edge_attr['type'] == EdgeType.SUPPLY
-                        or edge_attr['type'] == EdgeType.ROOT_CONNECTION):
+                if edge_attr['type'] == EdgeType.SUPPORT or edge_attr['type'] == EdgeType.ROOT_CONNECTION:
                     consensus_value += neighbor_consensus
                 elif edge_attr['type'] == EdgeType.OPPOSE:
                     consensus_value -= neighbor_consensus
+                elif edge_attr['type'] == EdgeType.SUPPLY:
+                    consensus_value += 0.5 * neighbor_consensus
 
             consensus[node] = consensus_value
             return consensus_value
@@ -200,6 +208,23 @@ class DynamicDiscussionGraph:
             resource = node['data'].get('resource', [])
             user_weight = node['data']['user_weight']
 
+            allowed_combinations = [
+                frozenset(["主意"]),
+                frozenset(["支持", "论证"]),
+                frozenset(["反对", "论证"]),
+                frozenset(["补充", "论证"]),
+                frozenset(["补充", "资料"]),
+                frozenset(["质疑", "疑问"]),
+            ]
+            resource_set = frozenset(resource)
+            if (resource_set and resource_set not in allowed_combinations) or (not resource_set and parent_id is not None):
+                raise ValueError("标注有错误，请检查")
+
+            # 如果是分裂的节点 再分配一个id
+            if node_id in unique_nodes:
+                node_id = node_id + '_1'
+            unique_nodes.add(node_id)
+
             if parent_id is None:  # 根节点没有 parent_id
                 node_type = NodeType.ROOT
             else:
@@ -236,6 +261,7 @@ class DynamicDiscussionGraph:
             for child in node.get('children', []):
                 dfs(child, parent_id=node_id)
 
+        unique_nodes = set()
         nodes = []
         edges = []
 
@@ -383,6 +409,11 @@ class DynamicDiscussionGraph:
     def graphs(self) -> List[nx.Graph]:
         return self._graphs
 
+    def number_of_nodes(self, idx: Optional[int] = None):
+        if idx is None:
+            idx = -1
+        return self._graphs[idx].number_of_nodes()
+
     def __getitem__(self, item):
         return self._graphs[item]
 
@@ -431,7 +462,7 @@ if __name__ == '__main__':
     # edges = [(1, 2, EdgeType.OPPOSE), (1, 3, EdgeType.OPPOSE), (1, 4, EdgeType.SUPPORT),
     #          (1, 5, EdgeType.SUPPORT), (5, 6, EdgeType.OPPOSE)]
     # ddg.add_graphs(nodes, edges)
-    ddg.load_graphs_from_json('../script/data/tmjy/389727634454528/labeled.json', 'D', 1)
+    ddg.load_graphs_from_json('../script/data/tmjy/389727634454528/1+389727634454528+1+389727634454528+labeled.json', 'D', 1)
     ddg.draw()
     print(ddg.get_consensus())
     print(ddg.get_skewness())

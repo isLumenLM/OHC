@@ -5,26 +5,33 @@
 import abc
 import json
 import os
+import pickle
 import time
 import webbrowser
 from pprint import pprint
+from typing import Dict, List, Optional
 
 import pandas as pd
+import colorama
 
 import sys
 
+import requests
+
 sys.path.append('..')
 from consensus.graph import DynamicDiscussionGraph
+
+colorama.init(autoreset=True)
 
 
 class PostManager(metaclass=abc.ABCMeta):
 
     def __init__(self):
+        self.login_session = None
         self.pid = None
         self.posts = None
+        self.idx = None
 
-        user, password = self._get_config()
-        self.login_session = self._login(user, password)
         self.init_json = None
         self.labeled_json = None
 
@@ -38,26 +45,33 @@ class PostManager(metaclass=abc.ABCMeta):
 
     def switch_post(self):
         try:
-            new_pid = input("请输入新的帖子ID: ")
-            self.pid = int(new_pid)
-            print(f"已切换到帖子ID: {self.pid}")
+            print(colorama.Fore.RED + "可以输入自定义序号+帖子ID，也可以只输入帖子id")
+
+            inputs = input("请输入新的帖子ID: ")
+            if '+' in inputs:
+                self.pid = int(inputs.split('+')[1])
+                self.idx = int(inputs.split('+')[0])
+            else:
+                self.pid = int(inputs)
+                self.idx = int(input("请输入自定义序号："))
+            print(f"已切换到帖子ID: {self.pid}, 自定义序号：{self.idx}")
         except ValueError:
-            print("输入错误，请输入有效的帖子ID。")
+            print("输入错误，请输入有效的帖子ID或自定义序号。")
 
         print("正在爬取帖子...")
         self._crawl_post()
         self._posts_to_json(self.posts)
-        if not os.path.exists(os.path.join(self.work_path, f'{self.pid}')):
-            os.makedirs(os.path.join(self.work_path, f'{self.pid}'))
+        if not os.path.exists(os.path.join(self.work_path, f'{self.idx}+{self.pid}')):
+            os.makedirs(os.path.join(self.work_path, f'{self.idx}+{self.pid}'))
         self._save_init_json()
 
         pd.DataFrame(self.posts).to_csv(
-            os.path.join(self.work_path, f'{self.pid}/source.csv'),
+            os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+source.csv'),
             index=False,
             encoding='utf-8_sig',
             sep='\t'
         )
-        print(f"帖子爬取完毕, 数据保存到{os.path.join(self.work_path, f'{self.pid}')}")
+        print(f"帖子爬取完毕, 数据保存到{os.path.join(self.work_path, f'{self.idx}+{self.pid}')}")
 
     @staticmethod
     def open_flow():
@@ -66,21 +80,23 @@ class PostManager(metaclass=abc.ABCMeta):
     def view_post_counts(self, labeled: bool = False):
         if not self._check():
             return
-        # TODO
+
         if labeled:
             ddg = DynamicDiscussionGraph()
             ddg.load_graphs_from_json(
-                json_path=os.path.join(self.work_path, f'{self.pid}/labeled.json'),
+                json_path=os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+labeled.json'),
                 granularity='D',
                 number=1,
                 draw=False
             )
             reply_times = ddg.unique_timestamps
+            nodes_num = ddg.number_of_nodes()
         else:
             reply_times = [post.get('replytime') for post in self.posts]
+            nodes_num = len(self.posts)
 
-        print(f"发帖时间：{reply_times[0]}")
-        print(f"最后回复时间：{reply_times[-1]}")
+        print(colorama.Fore.RED + f"发帖时间：{reply_times[0]}")
+        print(colorama.Fore.RED + f"最后回复时间：{reply_times[-1]}")
 
         print("可选时间粒度：")
         print("1.小时：H")
@@ -92,8 +108,10 @@ class PostManager(metaclass=abc.ABCMeta):
         granularity = input("请输入时间粒度（'H', 'D', 'W', 'M', 'Y'）：")
         number = int(input("请输入周期（正整数）："))
         time_bins = DynamicDiscussionGraph.time_binning(reply_times, granularity=granularity, number=number, draw=True)
-        print("分箱时间区间：")
+        print(colorama.Fore.RED + "分箱时间区间：")
         pprint(time_bins)
+        print(colorama.Fore.RED + f"时间单元数量：{len(time_bins)}")
+        print(colorama.Fore.RED + f"节点数：{nodes_num - 1}")
 
     def calculate_skewness_and_consensus(self):
         if not self._check():
@@ -107,22 +125,22 @@ class PostManager(metaclass=abc.ABCMeta):
         print("5.年：Y")
         print("例如，以25天进行分箱，时间粒度输入D，周期输入25")
         print("请确定已经标注好数据")
-        print(f"并将已经标注的数据放入{os.path.join(self.work_path, f'{self.pid}/labeled.json')}")
+        print(f"并将已经标注的数据放入{os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+labeled.json')}")
         granularity = input("请输入时间粒度（'H', 'D', 'W', 'M', 'Y'）：")
         number = int(input("请输入周期（正整数）："))
         ddg = DynamicDiscussionGraph()
         ddg.load_graphs_from_json(
-            json_path=os.path.join(self.work_path, f'{self.pid}/labeled.json'),
+            json_path=os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+labeled.json'),
             granularity=granularity,
             number=number,
             draw=True
         )
         # ddg.draw()
 
-        # TODO 偏度值竖的
         skewness = ddg.get_skewness(draw=True)
-        pd.DataFrame([skewness]).to_csv(
-            os.path.join(self.work_path, f'{self.pid}/skewness.csv'),
+        pd.DataFrame(skewness).to_csv(
+            os.path.join(self.work_path,
+                         f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+skewness+{number}{granularity}.csv'),
             index=False,
             encoding='utf-8_sig'
         )
@@ -132,20 +150,35 @@ class PostManager(metaclass=abc.ABCMeta):
         consensus['开始时间'] = [t1 for t1, t2 in time_bins]
         consensus['结束时间'] = [t2 for t1, t2 in time_bins]
         consensus = consensus.set_index(['开始时间', '结束时间'])
-        consensus.to_csv(os.path.join(self.work_path, f'{self.pid}/consensus.csv'), encoding='utf-8_sig')
+        consensus.to_csv(os.path.join(self.work_path,
+                                      f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+consensus+{number}{granularity}.csv'),
+                         encoding='utf-8_sig')
 
     def prompt_user(self):
+        user, password = self._get_config()
+        self.login_session = self._load_session(user)
+        if self.login_session is None:
+            self.login_session = self._login(user, password)
+            self._save_session(user)
+        else:
+            print(colorama.Fore.RED + f"从本地登录用户：{user}")
+
         while True:
-            print('\n\n')
+
+            if self.pid is None:
+                self.switch_post()
+
             print("=" * 30)
-            print(f"目前正在处理的帖子id: {self.pid}")
+            print(colorama.Fore.RED + f"目前正在处理的帖子id: {self.idx}+{self.pid}")
             print("请选择功能：")
             print("1. 切换帖子")
-            print("2. 打开脑图")
-            print("3. 查看时间分箱后的帖子数量（标注前）")
-            print("4. 查看时间分箱后的帖子数量（标注后）")
-            print("5. 计算偏度和共识度（标注后）")
-            print("6. 退出")
+            print("2. 重新登录")
+            print("3. 打开脑图")
+            print("4. 查看时间分箱后的帖子数量（标注前）")
+            print("5. 查看时间分箱后的帖子数量（标注后）")
+            print("6. 计算偏度和共识度（标注后）")
+            print("7. 退出")
+            print("=" * 30)
 
             choice = input("请输入你的选择（1-5）: ")
 
@@ -153,20 +186,24 @@ class PostManager(metaclass=abc.ABCMeta):
                 if choice == '1':
                     self.switch_post()
                 elif choice == '2':
-                    self.open_flow()
+                    user, password = self._get_config()
+                    self.login_session = self._login(user, password)
+                    self._save_session(user)
                 elif choice == '3':
-                    self.view_post_counts()
+                    self.open_flow()
                 elif choice == '4':
-                    self.view_post_counts(labeled=True)
+                    self.view_post_counts()
                 elif choice == '5':
-                    self.calculate_skewness_and_consensus()
+                    self.view_post_counts(labeled=True)
                 elif choice == '6':
+                    self.calculate_skewness_and_consensus()
+                elif choice == '7':
                     print("退出程序.")
                     break
                 else:
                     print("无效的输入，请重新输入。")
             except Exception as e:
-                print(f"发生错误：{e}")
+                print(colorama.Fore.RED + f"发生错误：{e}")
 
     def _posts_to_json(self, posts):
         self.init_json = self._read_json('config/init.json')
@@ -213,7 +250,8 @@ class PostManager(metaclass=abc.ABCMeta):
 
     def _save_init_json(self):
         init_json = json.dumps(self.init_json, ensure_ascii=False)
-        with open(os.path.join(self.work_path, f'{self.pid}/source.json'), 'w', encoding='utf-8') as f:
+        with open(os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+source.json'), 'w',
+                  encoding='utf-8') as f:
             f.write(init_json)
 
     @staticmethod
@@ -242,6 +280,32 @@ class PostManager(metaclass=abc.ABCMeta):
                 current_line = word
         wrapped_text += current_line.strip()
         return wrapped_text
+
+    def _posts_is_exists(self) -> bool:
+        if os.path.exists(os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+source.csv')):
+            return True
+        else:
+            return False
+
+    def _read_local_posts(self) -> List[Dict]:
+        print(colorama.Fore.RED + "检测到本地文件，读取本地文件")
+        df = pd.read_csv(os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+source.csv'),
+                         sep='\t')
+        return [row.to_dict() for ind, row in df.iterrows()]
+
+    def _save_session(self, user: str):
+        if not os.path.exists(os.path.join(self.work_path, f'session')):
+            os.makedirs(os.path.join(self.work_path, f'session'))
+
+        with open(os.path.join(self.work_path, f'session/{user}.pkl'), 'wb') as f:
+            pickle.dump(self.login_session, f)
+
+    def _load_session(self, user: str) -> Optional[requests.Session]:
+        if not os.path.exists(os.path.join(self.work_path, f'session/{user}.pkl')):
+            return None
+        with open(os.path.join(self.work_path, f'session/{user}.pkl'), 'rb') as f:
+            session = pickle.load(f)
+        return session
 
     @staticmethod
     def _convert_user_weight(group: str) -> int:
