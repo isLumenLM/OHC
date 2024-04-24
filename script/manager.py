@@ -165,7 +165,7 @@ class PostManager(metaclass=abc.ABCMeta):
 
         graph_info = ddg.to_graph_info()
         graph_info.to_csv(
-            os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+count.csv'),
+            os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+count+{number}{granularity}.csv'),
             encoding='utf-8_sig'
         )
 
@@ -197,27 +197,28 @@ class PostManager(metaclass=abc.ABCMeta):
 
             choice = input("请输入你的选择（1-7）: ")
 
-
-            if choice == '1':
-                self.switch_post()
-            elif choice == '2':
-                user, password = self._get_config()
-                self.login_session = self._login(user, password)
-                self._save_session(user)
-            elif choice == '3':
-                self.open_flow()
-            elif choice == '4':
-                self.view_post_counts()
-            elif choice == '5':
-                self.view_post_counts(labeled=True)
-            elif choice == '6':
-                self.calculate_skewness_and_consensus()
-            elif choice == '7':
-                print("退出程序.")
-                break
-            else:
-                print("无效的输入，请重新输入。")
-
+            try:
+                if choice == '1':
+                    self.switch_post()
+                elif choice == '2':
+                    user, password = self._get_config()
+                    self.login_session = self._login(user, password)
+                    self._save_session(user)
+                elif choice == '3':
+                    self.open_flow()
+                elif choice == '4':
+                    self.view_post_counts()
+                elif choice == '5':
+                    self.view_post_counts(labeled=True)
+                elif choice == '6':
+                    self.calculate_skewness_and_consensus()
+                elif choice == '7':
+                    print("退出程序.")
+                    break
+                else:
+                    print("无效的输入，请重新输入。")
+            except Exception as e:
+                print(colorama.Fore.RED + f"发生错误：{e}")
 
     def _posts_to_json(self, posts):
         self.init_json = self._read_json('config/init.json')

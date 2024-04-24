@@ -364,15 +364,15 @@ class DynamicDiscussionGraph:
         times = pd.to_datetime(time_list)
 
         # 根据粒度设置时间偏移
-        if granularity == 'H':
+        if granularity.upper() == 'H':
             offset = pd.DateOffset(hours=number)
-        elif granularity == 'D':
+        elif granularity.upper() == 'D':
             offset = pd.DateOffset(days=number)
-        elif granularity == 'W':
+        elif granularity.upper() == 'W':
             offset = pd.DateOffset(weeks=number)
-        elif granularity == 'M':
+        elif granularity.upper() == 'M':
             offset = pd.DateOffset(months=number)
-        elif granularity == 'Y':
+        elif granularity.upper() == 'Y':
             offset = pd.DateOffset(years=number)
         else:
             raise ValueError("Granularity must be 'H', 'D', 'W', 'M', or 'Y'.")
