@@ -84,7 +84,7 @@ class PostManager(metaclass=abc.ABCMeta):
         if labeled:
             ddg = DynamicDiscussionGraph()
             ddg.load_graphs_from_json(
-                json_path=os.path.join(self.work_path, f'{self.idx}+{self.pid}/labeled.json'),
+                json_path=os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+labeled.json'),
                 granularity='D',
                 number=1,
                 draw=False
@@ -125,12 +125,12 @@ class PostManager(metaclass=abc.ABCMeta):
         print("5.年：Y")
         print("例如，以25天进行分箱，时间粒度输入D，周期输入25")
         print("请确定已经标注好数据")
-        print(f"并将已经标注的数据放入{os.path.join(self.work_path, f'{self.idx}+{self.pid}/labeled.json')}")
+        print(f"并将已经标注的数据放入{os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+labeled.json')}")
         granularity = input("请输入时间粒度（'H', 'D', 'W', 'M', 'Y'）：")
         number = int(input("请输入周期（正整数）："))
         ddg = DynamicDiscussionGraph()
         ddg.load_graphs_from_json(
-            json_path=os.path.join(self.work_path, f'{self.idx}+{self.pid}/labeled.json'),
+            json_path=os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+labeled.json'),
             granularity=granularity,
             number=number,
             draw=True
