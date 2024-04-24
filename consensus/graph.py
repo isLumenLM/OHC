@@ -38,13 +38,13 @@ class NodeType(Enum):
 
 class DynamicDiscussionGraph:
     def __init__(self,
-                 nodes: List[Tuple[int, NodeType, Union[datetime, str], int, str]] = None,
+                 nodes: List[Tuple[int, NodeType, Union[datetime, str], str, int, str]] = None,
                  edges: List[Tuple[int, int, EdgeType]] = None,
                  granularity: str = 'D',
                  number: int = 1):
         """
-        nodes format: Tuple[node_id, node_type, timestamp, user_weight, text], for instance:
-                        [(1, NodeType.IDEA, '2022-01-01', 2, 'text1'),
+        nodes format: Tuple[node_id, node_type, timestamp, user, user_weight, text], for instance:
+                        [(1, NodeType.IDEA, '2022-01-01', 123, 2, 'text1'),
                         (2, NodeType.ARGUMENTATION, '2022-01-01', 3, 'text2')]
         edges format: Tuple[src_node, dst_node, edge_type], for instance:
                         [(1, 2, EdgeType.SUPPORT), (1, 3, EdgeType.SUPPORT)]
@@ -52,24 +52,25 @@ class DynamicDiscussionGraph:
         self._graphs: List[nx.Graph] = []
         self._timestamp: List[datetime] = []
         self._root: Optional[int] = None
-        self.unique_timestamps: List[datetime] = []
+        self._unique_timestamps: List[datetime] = []
+        self._time_bins: List[Tuple[pd.Timestamp, pd.Timestamp]] = []
 
         if nodes is not None and edges is not None:
             self.add_graphs(nodes, edges, granularity, number)
 
     def add_graphs(self,
-                   nodes: List[Tuple[int, NodeType, Union[datetime, str], int, str]],
+                   nodes: List[Tuple[int, NodeType, Union[datetime, str], str, int, str]],
                    edges: List[Tuple[int, int, EdgeType]],
                    granularity: str = 'D',
                    number: int = 1,
                    draw: bool = False):
 
         if isinstance(nodes[0][2], str):
-            nodes = [(node_id, node_type, datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S'), weight, text) for
-                     node_id, node_type, timestamp, weight, text in nodes]
+            nodes = [(node_id, node_type, datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S'), user, weight, text) for
+                     node_id, node_type, timestamp, user, weight, text in nodes]
 
         # 一个id只能有一个节点
-        if len(set([node_id for node_id, _, _, _, _ in nodes])) != len(nodes):
+        if len(set([node_id for node_id, _, _, _, _, _ in nodes])) != len(nodes):
             raise ValueError('duplicate node_id')
 
         # 一个节点只能有一条边
@@ -78,7 +79,7 @@ class DynamicDiscussionGraph:
 
         unique_timestamps = set()
         roots = set()
-        for node_id, node_type, timestamp, weight, text in nodes:
+        for node_id, node_type, timestamp, user, weight, text in nodes:
             unique_timestamps.add(timestamp)
             if node_type == NodeType.ROOT:
                 roots.add(node_id)
@@ -88,13 +89,13 @@ class DynamicDiscussionGraph:
         else:
             self._root = roots.pop()
 
-        self.unique_timestamps = [datetime.strftime(timestamp, '%Y-%m-%d %H:%M:%S') for timestamp in sorted(unique_timestamps)]
-        time_bins = self.time_binning(self.unique_timestamps, granularity, number, draw)
-        for start_time, end_time in time_bins:
-            nodes_at_timestamp = [(node_id, node_type, ts, weight, text)
-                                  for node_id, node_type, ts, weight, text in nodes
+        self._unique_timestamps = [datetime.strftime(timestamp, '%Y-%m-%d %H:%M:%S') for timestamp in sorted(unique_timestamps)]
+        self._time_bins = self.time_binning(self.unique_timestamps, granularity, number, draw)
+        for start_time, end_time in self._time_bins:
+            nodes_at_timestamp = [(node_id, node_type, ts, user, weight, text)
+                                  for node_id, node_type, ts, user, weight, text in nodes
                                   if ts < end_time]
-            valid_nodes_at_timestamp = set(node_id for node_id, _, _, _, _ in nodes_at_timestamp)
+            valid_nodes_at_timestamp = set(node_id for node_id, _, _, _, _, _ in nodes_at_timestamp)
             edges_at_timestamp = [(src, dst, edge_type)
                                   for src, dst, edge_type in edges
                                   if src in valid_nodes_at_timestamp and dst in valid_nodes_at_timestamp]
@@ -104,11 +105,12 @@ class DynamicDiscussionGraph:
 
     def _add_graph(self,
                    timestamp: datetime,
-                   nodes: List[Tuple[int, NodeType, Union[datetime, str], int, str]],
+                   nodes: List[Tuple[int, NodeType, Union[datetime, str], str, int, str]],
                    edges: List[Tuple[int, int, EdgeType]]):
         g = nx.Graph()
-        nodes_with_attrs = [(node, {'type': node_type, 'timestamp': timestamp, 'weight': weight, 'text': text}) for
-                            node, node_type, timestamp, weight, text in nodes]
+        nodes_with_attrs = [(node, {'type': node_type, 'timestamp': timestamp,
+                                    'user': user, 'weight': weight, 'text': text}) for
+                            node, node_type, timestamp, user, weight, text in nodes]
         g.add_nodes_from(nodes_with_attrs)
 
         edges_with_attrs = [(src, dst, {'type': edge_type}) for src, dst, edge_type in edges]
@@ -203,9 +205,10 @@ class DynamicDiscussionGraph:
         # 递归遍历节点的函数
         def dfs(node, parent_id=None):
             node_id = node['data']['id']
-            text = node['data']['text']
+            text = node['data']['source_text']
             replytime = node['data']['replytime']
             resource = node['data'].get('resource', [])
+            user = node['data']['user']
             user_weight = node['data']['user_weight']
 
             allowed_combinations = [
@@ -239,7 +242,7 @@ class DynamicDiscussionGraph:
                 else:
                     raise ValueError("标注有错误，请检查")
 
-            nodes.append((node_id, node_type, replytime, user_weight, text))
+            nodes.append((node_id, node_type, replytime, user, user_weight, text))
 
             if parent_id is not None:
                 if len(resource) == 2 and '支持' in resource:
@@ -409,68 +412,81 @@ class DynamicDiscussionGraph:
     def graphs(self) -> List[nx.Graph]:
         return self._graphs
 
+    @property
+    def unique_timestamps(self) -> List[datetime]:
+        return self._unique_timestamps
+
+    @property
+    def time_bins(self) -> List[Tuple[pd.Timestamp, pd.Timestamp]]:
+        return self._time_bins
+
     def number_of_nodes(self, idx: Optional[int] = None):
         if idx is None:
             idx = -1
         return self._graphs[idx].number_of_nodes()
 
+    def to_sentence_pair(self) -> pd.DataFrame:
+        self._check_graphs()
+
+        graph = self._graphs[-1]
+
+        sentence_pairs = []
+        for edge in graph.edges(data=True):
+            src, dst, data = edge
+            src_data = graph.nodes[src]
+            dst_data = graph.nodes[dst]
+            edge_type = data['type'].value
+
+            if src_data['type'] == NodeType.ROOT or dst_data['type'] == NodeType.ROOT:
+                continue
+
+            sentence_pairs.append({
+                'text1': src_data['text'],
+                'text2': dst_data['text'],
+                'text1_type': src_data['type'].value,
+                'text2_type': dst_data['type'].value,
+                'edge_type': edge_type
+            })
+
+        return pd.DataFrame(sentence_pairs)
+
+    def to_graph_info(self) -> pd.DataFrame:
+        self._check_graphs()
+
+        prev_users = set()
+        prev_nodes = set()
+
+        data = {
+            '用户数量': [],
+            '发言数量': [],
+            '主意数量': []
+        }
+
+        for idx, graph in enumerate(self._graphs):
+            current_users = {graph.nodes[node]['user'] for node in graph}
+            current_nodes = set(graph.nodes)
+
+            new_users = current_users - prev_users
+            new_nodes = current_nodes - prev_nodes
+
+            prev_users = current_users
+            prev_nodes = current_nodes
+
+            new_idea_count = sum(1 for node in new_nodes if graph.nodes[node]['type'] == NodeType.IDEA)
+
+            data["用户数量"].append(len(new_users))
+            data["发言数量"].append(len(new_nodes))
+            data["主意数量"].append(new_idea_count)
+
+        time_intervals = [f"{start_time.strftime('%Y-%m-%d %H:%M:%S')} - {end_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                          for start_time, end_time in self._time_bins]
+        df = pd.DataFrame(data, index=time_intervals)
+        df['开始时间'] = [t1 for t1, t2 in self._time_bins]
+        df['结束时间'] = [t2 for t1, t2 in self._time_bins]
+        df = df.set_index(['开始时间', '结束时间'])
+
+        return df
+
     def __getitem__(self, item):
         return self._graphs[item]
-
-
-if __name__ == '__main__':
-    ddg = DynamicDiscussionGraph()
-    # nodes = [(0, NodeType.ROOT, '2017-09-06 00:00:00', 0, '求助'),
-    #          (1, NodeType.IDEA, '2017-09-06 00:00:00', 3, '多跑几家医院多问几个医生'),
-    #          (2, NodeType.ARGUMENTATION, '2017-09-07 00:00:00', 2, '好的！跑了好几家了，说是先化疗'),
-    #          (3, NodeType.ARGUMENTATION, '2017-09-12 00:00:00', 4, '多上网看看'),
-    #          (4, NodeType.IDEA, '2017-09-06 00:00:00', 5, '搞清楚为什么直接9291，不考虑一代TKI'),
-    #          (5, NodeType.ARGUMENTATION, '2017-09-07 00:00:00', 3,
-    #           '要谨慎，如果从9291起，一旦耐药，目前来讲可选择的靶向药不是很多，正常的顺序都是从一代靶向药吃起'),
-    #          (6, NodeType.ARGUMENTATION, '2017-09-08 00:00:00', 2, '我准备先吃靶向药，穿插进行化疗，进行复敏'),
-    #          (7, NodeType.ARGUMENTATION, '2017-09-09 00:00:00', 4, '有基因突变患者，靶向为一线方案为佳，这得到多数认可'),
-    #          (8, NodeType.ARGUMENTATION, '2017-09-11 00:00:00', 2,
-    #           '19.20突变，是黄金突变，首先应该用易瑞沙或者凯美纳，9291为后者'),
-    #          (9, NodeType.ARGUMENTATION, '2017-09-12 00:00:00', 3, '有突变化疗的效果可能不好，还是从一代的易特开始吧'),
-    #          (10, NodeType.ARGUMENTATION, '2017-09-09 00:00:00', 2, '是啊，毕竟这个副作用很小而且效果明显'),
-    #          (11, NodeType.IDEA, '2017-09-16 00:00:00', 3, '化疗，进行复敏，加油'),
-    #          (12, NodeType.IDEA, '2017-09-08 00:00:00', 2, '谢谢，我也打算从易瑞沙开始吃'),
-    #          (13, NodeType.ARGUMENTATION, '2017-09-14 00:00:00', 4, '现在吃易瑞沙呢'),
-    #          (14, NodeType.ARGUMENTATION, '2017-09-16 00:00:00', 3, '首先应该用易瑞沙')]
-    # edges = [(0, 1, EdgeType.ROOT_CONNECTION),
-    #          (1, 2, EdgeType.SUPPORT),
-    #          (1, 3, EdgeType.SUPPLY),
-    #          (0, 4, EdgeType.ROOT_CONNECTION),
-    #          (4, 5, EdgeType.SUPPORT),
-    #          (4, 6, EdgeType.SUPPLY),
-    #          (4, 7, EdgeType.SUPPORT),
-    #          (4, 8, EdgeType.SUPPORT),
-    #          (4, 9, EdgeType.SUPPORT),
-    #          (7, 10, EdgeType.SUPPORT),
-    #          (0, 11, EdgeType.ROOT_CONNECTION),
-    #          (0, 12, EdgeType.ROOT_CONNECTION),
-    #          (12, 13, EdgeType.SUPPORT),
-    #          (13, 14, EdgeType.SUPPORT)]
-    # nodes = [(1, NodeType.IDEA, '2016-03-27 00:00:00', 3, '直接上9291把'),
-    #          (2, NodeType.ARGUMENTATION, '2016-03-30 00:00:00', 2, '9291肯定是放到最后一个考虑关键是有误脑转要搞清楚'),
-    #          (3, NodeType.ARGUMENTATION, '2016-04-02 00:00:00', 3, '4002/9291/3759什么的，现在肯定不考虑'),
-    #          (4, NodeType.ARGUMENTATION, '2016-04-03 00:00:00', 4,
-    #           '2992,4002,9291都有790靶点，只是2992对790是弱效，4002,9291对790打击力大些，但是4002不入脑，9291入脑。右脑转，最好用9291'),
-    #          (5, NodeType.ARGUMENTATION, '2016-04-03 00:00:00', 3, '我家一声也建议直接上9291'),
-    #          (6, NodeType.ARGUMENTATION, '2016-04-04 00:00:00', 2,
-    #           '群里人一般都建议暂不把9291用上，好药留后面，是怕耐药了没有后续药，所以拖时间')]
-    # edges = [(1, 2, EdgeType.OPPOSE), (1, 3, EdgeType.OPPOSE), (1, 4, EdgeType.SUPPORT),
-    #          (1, 5, EdgeType.SUPPORT), (5, 6, EdgeType.OPPOSE)]
-    # ddg.add_graphs(nodes, edges)
-    ddg.load_graphs_from_json('../script/data/tmjy/389727634454528/1+389727634454528+1+389727634454528+labeled.json', 'D', 1)
-    ddg.draw()
-    print(ddg.get_consensus())
-    print(ddg.get_skewness())
-    time_bins = ddg.time_binning(ddg.unique_timestamps, granularity='D', number=1, draw=True)
-    print(time_bins[0][0])
-    consensus = pd.DataFrame(ddg.get_consensus())
-    consensus['t1'] = [t1 for t1, t2 in time_bins]
-    consensus['t2'] = [t2 for t1, t2 in time_bins]
-    consensus = consensus.set_index(['t1', 't2'])
-    print(consensus)
 

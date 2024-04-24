@@ -3,31 +3,80 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
-        <entry key="\script\data\389727634454528.csv">
+        <entry key="\script\data\tmjy\1+389727634454528\1+389727634454528+consensus+1D.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="\script\data\389727634454528\389727634454528.csv">
+        <entry key="\script\data\tmjy\1+389727634454528\1+389727634454528+count.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\1+389727634454528\1+389727634454528+pairs.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\1+389727634454528\1+389727634454528+skewness+1D.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\1+389727634454528\1+389727634454528+skewness.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\1+389727634454528\1+389727634454528+source.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="&#9;" />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\2+391320139028480\2+391320139028480+source.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="&#9;" />
             </Attribute>
           </value>
         </entry>
         <entry key="\script\data\tmjy\389727634454528\389727634454528.csv">
           <value>
             <Attribute>
+              <option name="separator" value="&#9;" />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\389727634454528\skewness.csv">
+          <value>
+            <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="\script\data\tmjy\389727634454528\389727634454528_consensus.csv">
+        <entry key="\script\data\tmjy\391320139028480\source.csv">
           <value>
             <Attribute>
-              <option name="separator" value="," />
+              <option name="separator" value="&#9;" />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\404560311435264\source.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="&#9;" />
             </Attribute>
           </value>
         </entry>

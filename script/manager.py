@@ -84,7 +84,7 @@ class PostManager(metaclass=abc.ABCMeta):
         if labeled:
             ddg = DynamicDiscussionGraph()
             ddg.load_graphs_from_json(
-                json_path=os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+labeled.json'),
+                json_path=os.path.join(self.work_path, f'{self.idx}+{self.pid}/labeled.json'),
                 granularity='D',
                 number=1,
                 draw=False
@@ -125,12 +125,12 @@ class PostManager(metaclass=abc.ABCMeta):
         print("5.年：Y")
         print("例如，以25天进行分箱，时间粒度输入D，周期输入25")
         print("请确定已经标注好数据")
-        print(f"并将已经标注的数据放入{os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+labeled.json')}")
+        print(f"并将已经标注的数据放入{os.path.join(self.work_path, f'{self.idx}+{self.pid}/labeled.json')}")
         granularity = input("请输入时间粒度（'H', 'D', 'W', 'M', 'Y'）：")
         number = int(input("请输入周期（正整数）："))
         ddg = DynamicDiscussionGraph()
         ddg.load_graphs_from_json(
-            json_path=os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+labeled.json'),
+            json_path=os.path.join(self.work_path, f'{self.idx}+{self.pid}/labeled.json'),
             granularity=granularity,
             number=number,
             draw=True
@@ -142,7 +142,8 @@ class PostManager(metaclass=abc.ABCMeta):
             os.path.join(self.work_path,
                          f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+skewness+{number}{granularity}.csv'),
             index=False,
-            encoding='utf-8_sig'
+            encoding='utf-8_sig',
+            header=['偏度值']
         )
 
         time_bins = ddg.time_binning(ddg.unique_timestamps, granularity=granularity, number=number, draw=False)
@@ -150,9 +151,23 @@ class PostManager(metaclass=abc.ABCMeta):
         consensus['开始时间'] = [t1 for t1, t2 in time_bins]
         consensus['结束时间'] = [t2 for t1, t2 in time_bins]
         consensus = consensus.set_index(['开始时间', '结束时间'])
-        consensus.to_csv(os.path.join(self.work_path,
-                                      f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+consensus+{number}{granularity}.csv'),
-                         encoding='utf-8_sig')
+        consensus.to_csv(
+            os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+consensus+{number}{granularity}.csv'),
+            encoding='utf-8_sig'
+        )
+
+        sentence_pair = ddg.to_sentence_pair()
+        sentence_pair.to_csv(
+            os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+pairs.csv'),
+            index=False,
+            encoding='utf-8_sig'
+        )
+
+        graph_info = ddg.to_graph_info()
+        graph_info.to_csv(
+            os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+count.csv'),
+            encoding='utf-8_sig'
+        )
 
     def prompt_user(self):
         user, password = self._get_config()
@@ -180,37 +195,36 @@ class PostManager(metaclass=abc.ABCMeta):
             print("7. 退出")
             print("=" * 30)
 
-            choice = input("请输入你的选择（1-5）: ")
+            choice = input("请输入你的选择（1-7）: ")
 
-            try:
-                if choice == '1':
-                    self.switch_post()
-                elif choice == '2':
-                    user, password = self._get_config()
-                    self.login_session = self._login(user, password)
-                    self._save_session(user)
-                elif choice == '3':
-                    self.open_flow()
-                elif choice == '4':
-                    self.view_post_counts()
-                elif choice == '5':
-                    self.view_post_counts(labeled=True)
-                elif choice == '6':
-                    self.calculate_skewness_and_consensus()
-                elif choice == '7':
-                    print("退出程序.")
-                    break
-                else:
-                    print("无效的输入，请重新输入。")
-            except Exception as e:
-                print(colorama.Fore.RED + f"发生错误：{e}")
+
+            if choice == '1':
+                self.switch_post()
+            elif choice == '2':
+                user, password = self._get_config()
+                self.login_session = self._login(user, password)
+                self._save_session(user)
+            elif choice == '3':
+                self.open_flow()
+            elif choice == '4':
+                self.view_post_counts()
+            elif choice == '5':
+                self.view_post_counts(labeled=True)
+            elif choice == '6':
+                self.calculate_skewness_and_consensus()
+            elif choice == '7':
+                print("退出程序.")
+                break
+            else:
+                print("无效的输入，请重新输入。")
+
 
     def _posts_to_json(self, posts):
         self.init_json = self._read_json('config/init.json')
         children = []
         for idx, post in enumerate(posts):
             if idx == 0:
-
+                self.init_json['title'] = post.get('title')
                 self.init_json['data']['root']['data'] = {
                     'id': post.get('rid'),
                     'created': int(time.time() * 1000),
@@ -224,7 +238,9 @@ class PostManager(metaclass=abc.ABCMeta):
                              f"【文本内容】：{post.get('text')[0:20]}"),
                     'replytime': post.get('replytime'),
                     'rid': post.get('rid'),
+                    'user': post.get('uid'),
                     'user_weight': self._convert_user_weight(post.get('group')),
+                    'source_text': post.get('text'),
                 }
             else:
                 children.append({
@@ -241,7 +257,9 @@ class PostManager(metaclass=abc.ABCMeta):
                         "resource": ["主意", "论证", "疑问", "资料", "支持", "反对", "补充", "质疑"],
                         'replytime': post.get('replytime'),
                         'rid': post.get('rid'),
+                        'user': post.get('uid'),
                         'user_weight': self._convert_user_weight(post.get('group')),
+                        'source_text': post.get('text'),
                     },
                     "children": []
                 })
