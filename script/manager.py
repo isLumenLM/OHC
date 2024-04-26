@@ -11,6 +11,7 @@ import webbrowser
 from pprint import pprint
 from typing import Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 import colorama
 
@@ -19,7 +20,7 @@ import sys
 import requests
 
 sys.path.append('..')
-from consensus.graph import DynamicDiscussionGraph
+from consensus.graph import DynamicDiscussionGraph, NodeType
 
 colorama.init(autoreset=True)
 
@@ -44,26 +45,28 @@ class PostManager(metaclass=abc.ABCMeta):
         return True
 
     def switch_post(self):
-        try:
-            print(colorama.Fore.RED + "可以输入自定义序号+帖子ID，也可以只输入帖子id")
 
-            inputs = input("请输入新的帖子ID: ")
-            if '+' in inputs:
-                self.pid = int(inputs.split('+')[1])
-                self.idx = int(inputs.split('+')[0])
-            else:
-                self.pid = int(inputs)
-                self.idx = int(input("请输入自定义序号："))
-            print(f"已切换到帖子ID: {self.pid}, 自定义序号：{self.idx}")
-        except ValueError:
-            print("输入错误，请输入有效的帖子ID或自定义序号。")
+        while True:
+            try:
+                print(colorama.Fore.RED + "可以输入自定义序号+帖子ID，也可以只输入帖子id")
+
+                inputs = input("请输入新的帖子ID: ")
+                if '+' in inputs:
+                    self.pid = int(inputs.split('+')[1])
+                    self.idx = int(inputs.split('+')[0])
+                else:
+                    self.pid = int(inputs)
+                    self.idx = int(input("请输入自定义序号："))
+                print(f"已切换到帖子ID: {self.pid}, 自定义序号：{self.idx}")
+                break
+            except ValueError:
+                print("输入错误，请输入有效的帖子ID或自定义序号。")
 
         print("正在爬取帖子...")
         self._crawl_post()
-        self._posts_to_json(self.posts)
+
         if not os.path.exists(os.path.join(self.work_path, f'{self.idx}+{self.pid}')):
             os.makedirs(os.path.join(self.work_path, f'{self.idx}+{self.pid}'))
-        self._save_init_json()
 
         pd.DataFrame(self.posts).to_csv(
             os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+source.csv'),
@@ -71,6 +74,10 @@ class PostManager(metaclass=abc.ABCMeta):
             encoding='utf-8_sig',
             sep='\t'
         )
+
+        self._posts_to_json(self.posts)
+        self._save_init_json()
+
         print(f"帖子爬取完毕, 数据保存到{os.path.join(self.work_path, f'{self.idx}+{self.pid}')}")
 
     @staticmethod
@@ -97,6 +104,7 @@ class PostManager(metaclass=abc.ABCMeta):
 
         print(colorama.Fore.RED + f"发帖时间：{reply_times[0]}")
         print(colorama.Fore.RED + f"最后回复时间：{reply_times[-1]}")
+        print(colorama.Fore.RED + f"节点数：{nodes_num - 1}")
 
         print("可选时间粒度：")
         print("1.小时：H")
@@ -107,11 +115,10 @@ class PostManager(metaclass=abc.ABCMeta):
         print("例如，以25天进行分箱，时间粒度输入D，周期输入25")
         granularity = input("请输入时间粒度（'H', 'D', 'W', 'M', 'Y'）：")
         number = int(input("请输入周期（正整数）："))
-        time_bins = DynamicDiscussionGraph.time_binning(reply_times, granularity=granularity, number=number, draw=True)
+        time_bins = DynamicDiscussionGraph.time_binning(reply_times, granularity=granularity,
+                                                        number=number, draw=True, verbose=True)
         print(colorama.Fore.RED + "分箱时间区间：")
         pprint(time_bins)
-        print(colorama.Fore.RED + f"时间单元数量：{len(time_bins)}")
-        print(colorama.Fore.RED + f"节点数：{nodes_num - 1}")
 
     def calculate_skewness_and_consensus(self):
         if not self._check():
@@ -152,7 +159,8 @@ class PostManager(metaclass=abc.ABCMeta):
         consensus['结束时间'] = [t2 for t1, t2 in time_bins]
         consensus = consensus.set_index(['开始时间', '结束时间'])
         consensus.to_csv(
-            os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+consensus+{number}{granularity}.csv'),
+            os.path.join(self.work_path,
+                         f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+consensus+{number}{granularity}.csv'),
             encoding='utf-8_sig'
         )
 
@@ -169,6 +177,25 @@ class PostManager(metaclass=abc.ABCMeta):
             encoding='utf-8_sig'
         )
 
+        ls_graph = ddg.graphs[-1]
+        features_dict = {
+            '偏度值总体平均值': np.average(skewness),
+            '发言类型的数量': len({ls_graph.nodes[node]['type'] for node in ls_graph if ls_graph.nodes[node]['type'] != NodeType.ROOT}),
+            '主意个数': len({node for node in ls_graph if ls_graph.nodes[node]['type'] != NodeType.IDEA}),
+            '线程广度': ddg.max_nodes_in_a_level(),
+            '线程深度': ddg.max_depth(),
+            '载体丰富度': self.posts[0].get('imgs') + self.posts[0].get('external_links_count'),
+            '第一条评论时间': self.posts[0].get('replytime'),
+            '最后一条评论时间': self.posts[-1].get('replytime'),
+            '发帖者发表主题数': self.posts[0].get('posts'),
+            '发帖者回帖数': self.posts[0].get('replys'),
+        }
+        pd.DataFrame([features_dict]).to_csv(
+            os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+features+{number}{granularity}.csv'),
+            encoding='utf-8_sig',
+            index=False
+        )
+
     def prompt_user(self):
         user, password = self._get_config()
         self.login_session = self._load_session(user)
@@ -179,25 +206,24 @@ class PostManager(metaclass=abc.ABCMeta):
             print(colorama.Fore.RED + f"从本地登录用户：{user}")
 
         while True:
-
-            if self.pid is None:
-                self.switch_post()
-
-            print("=" * 30)
-            print(colorama.Fore.RED + f"目前正在处理的帖子id: {self.idx}+{self.pid}")
-            print("请选择功能：")
-            print("1. 切换帖子")
-            print("2. 重新登录")
-            print("3. 打开脑图")
-            print("4. 查看时间分箱后的帖子数量（标注前）")
-            print("5. 查看时间分箱后的帖子数量（标注后）")
-            print("6. 计算偏度和共识度（标注后）")
-            print("7. 退出")
-            print("=" * 30)
-
-            choice = input("请输入你的选择（1-7）: ")
-
             try:
+                if self.pid is None:
+                    self.switch_post()
+
+                print("=" * 30)
+                print(colorama.Fore.RED + f"目前正在处理的帖子id: {self.idx}+{self.pid}")
+                print("请选择功能：")
+                print("1. 切换帖子")
+                print("2. 重新登录")
+                print("3. 打开脑图")
+                print("4. 查看时间分箱后的帖子数量（标注前）")
+                print("5. 查看时间分箱后的帖子数量（标注后）")
+                print("6. 计算偏度和共识度（标注后）")
+                print("7. 退出")
+                print("=" * 30)
+
+                choice = input("请输入你的选择（1-7）: ")
+
                 if choice == '1':
                     self.switch_post()
                 elif choice == '2':
@@ -227,7 +253,7 @@ class PostManager(metaclass=abc.ABCMeta):
             if idx == 0:
                 self.init_json['title'] = post.get('title')
                 self.init_json['data']['root']['data'] = {
-                    'id': post.get('rid'),
+                    'id': str(post.get('rid')),
                     'created': int(time.time() * 1000),
                     'text': (f"【rid】：{post.get('rid')}\n"
                              f"【标题】：{post.get('title')}"
@@ -236,17 +262,17 @@ class PostManager(metaclass=abc.ABCMeta):
                              f"【用户组】：{post.get('group')}\n"
                              f"【糖尿病类型】：{post.get('disease')}\n"
                              f"【楼层】：{post.get('floor')}\n"
-                             f"【文本内容】：{post.get('text')[0:20]}"),
+                             f"【文本内容】：{post.get('text', '')[0:20]}"),
                     'replytime': post.get('replytime'),
-                    'rid': post.get('rid'),
-                    'user': post.get('uid'),
+                    'rid': str(post.get('rid')),
+                    'user': str(post.get('uid')),
                     'user_weight': self._convert_user_weight(post.get('group')),
                     'source_text': post.get('text'),
                 }
             else:
                 children.append({
                     'data': {
-                        "id": post.get('rid'),
+                        "id": str(post.get('rid')),
                         "created": int(time.time() * 1000),
                         "text": (f"【rid】：{post.get('rid')}\n"
                                  f"【时间】：{post.get('replytime')}\n"
@@ -254,11 +280,11 @@ class PostManager(metaclass=abc.ABCMeta):
                                  f"【用户组】：{post.get('group')}\n"
                                  f"【糖尿病类型】：{post.get('disease')}\n"
                                  f"【楼层】：{post.get('floor')}\n"
-                                 f"【文本内容】：{self._wrap_text(post.get('text'), 30)}"),
+                                 f"【文本内容】：{self._wrap_text(post.get('text', ''), 30)}"),
                         "resource": ["主意", "论证", "疑问", "资料", "支持", "反对", "补充", "质疑"],
                         'replytime': post.get('replytime'),
-                        'rid': post.get('rid'),
-                        'user': post.get('uid'),
+                        'rid': str(post.get('rid')),
+                        'user': str(post.get('uid')),
                         'user_weight': self._convert_user_weight(post.get('group')),
                         'source_text': post.get('text'),
                     },

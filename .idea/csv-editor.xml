@@ -45,6 +45,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\script\data\tmjy\12+1340232\12+1340232+source.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="&#9;" />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\script\data\tmjy\2+391320139028480\2+391320139028480+source.csv">
           <value>
             <Attribute>
@@ -73,7 +80,28 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\script\data\tmjy\4+376096047714304\4+376096047714304+source.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="&#9;" />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\script\data\tmjy\404560311435264\source.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="&#9;" />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\5+1066264\5+1066264+features+1d.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\5+1066264\5+1066264+source.csv">
           <value>
             <Attribute>
               <option name="separator" value="&#9;" />

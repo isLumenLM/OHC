@@ -9,6 +9,7 @@ from enum import Enum
 from typing import List, Tuple, Union, Optional, Dict
 from datetime import datetime
 
+import colorama
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -38,16 +39,16 @@ class NodeType(Enum):
 
 class DynamicDiscussionGraph:
     def __init__(self,
-                 nodes: List[Tuple[int, NodeType, Union[datetime, str], str, int, str]] = None,
-                 edges: List[Tuple[int, int, EdgeType]] = None,
+                 nodes: List[Tuple[str, NodeType, Union[datetime, str], str, int, str]] = None,
+                 edges: List[Tuple[str, str, EdgeType]] = None,
                  granularity: str = 'D',
                  number: int = 1):
         """
         nodes format: Tuple[node_id, node_type, timestamp, user, user_weight, text], for instance:
-                        [(1, NodeType.IDEA, '2022-01-01', 123, 2, 'text1'),
-                        (2, NodeType.ARGUMENTATION, '2022-01-01', 3, 'text2')]
+                        [('1', NodeType.IDEA, '2022-01-01', '123', 2, 'text1'),
+                        ('2', NodeType.ARGUMENTATION, '2022-01-01', '234', 3, 'text2')]
         edges format: Tuple[src_node, dst_node, edge_type], for instance:
-                        [(1, 2, EdgeType.SUPPORT), (1, 3, EdgeType.SUPPORT)]
+                        [('1', '2', EdgeType.SUPPORT), (1, 3, EdgeType.SUPPORT)]
         """
         self._graphs: List[nx.Graph] = []
         self._timestamp: List[datetime] = []
@@ -59,8 +60,8 @@ class DynamicDiscussionGraph:
             self.add_graphs(nodes, edges, granularity, number)
 
     def add_graphs(self,
-                   nodes: List[Tuple[int, NodeType, Union[datetime, str], str, int, str]],
-                   edges: List[Tuple[int, int, EdgeType]],
+                   nodes: List[Tuple[str, NodeType, Union[datetime, str], str, int, str]],
+                   edges: List[Tuple[str, str, EdgeType]],
                    granularity: str = 'D',
                    number: int = 1,
                    draw: bool = False):
@@ -105,8 +106,8 @@ class DynamicDiscussionGraph:
 
     def _add_graph(self,
                    timestamp: datetime,
-                   nodes: List[Tuple[int, NodeType, Union[datetime, str], str, int, str]],
-                   edges: List[Tuple[int, int, EdgeType]]):
+                   nodes: List[Tuple[str, NodeType, Union[datetime, str], str, int, str]],
+                   edges: List[Tuple[str, str, EdgeType]]):
         g = nx.Graph()
         nodes_with_attrs = [(node, {'type': node_type, 'timestamp': timestamp,
                                     'user': user, 'weight': weight, 'text': text}) for
@@ -166,7 +167,7 @@ class DynamicDiscussionGraph:
             plt.plot(graphs_skewness, marker="o")
             plt.xlabel("时间点")
             plt.ylabel("偏度")
-            plt.show()
+            plt.show(block=True)
 
         return graphs_skewness
 
@@ -204,12 +205,12 @@ class DynamicDiscussionGraph:
 
         # 递归遍历节点的函数
         def dfs(node, parent_id=None):
-            node_id = node['data']['id']
-            text = node['data']['source_text']
-            replytime = node['data']['replytime']
-            resource = node['data'].get('resource', [])
-            user = node['data']['user']
-            user_weight = node['data']['user_weight']
+            node_id: str = str(node['data']['id'])
+            text: str = node['data']['source_text']
+            replytime: str = node['data']['replytime']
+            resource: List = node['data'].get('resource', [])
+            user: str = str(node['data']['user'])
+            user_weight: int = node['data']['user_weight']
 
             allowed_combinations = [
                 frozenset(["主意"]),
@@ -324,7 +325,7 @@ class DynamicDiscussionGraph:
         self._check_graphs()
         if index is not None:
             self._draw_graph(index)
-            plt.show()
+            plt.show(block=True)
         else:
             total_graphs = len(self._graphs)
             if total_graphs == 0:
@@ -348,16 +349,21 @@ class DynamicDiscussionGraph:
                 axes[j].axis('off')
 
             plt.tight_layout()
-            plt.show()
+            plt.show(block=True)
 
     @staticmethod
-    def time_binning(time_list: List[Union[str, datetime]], granularity: str = 'D', number: int = 1, draw: bool = False) -> List[Tuple[pd.Timestamp, pd.Timestamp]]:
+    def time_binning(time_list: List[Union[str, datetime]],
+                     granularity: str = 'D',
+                     number: int = 1,
+                     draw: bool = False,
+                     verbose: bool = False) -> List[Tuple[pd.Timestamp, pd.Timestamp]]:
         """
         对时间列表进行分箱。
         :param time_list: 时间字符串的列表。
         :param granularity: 分箱的粒度，可以是'H', 'D', 'W', 'M', 或 'Y'。
         :param number: 分箱的数量。
         :param draw: 是否画图。
+        :param verbose: 是否输出时间单元数
         :return: 每个分箱的起始和结束时间（左闭右开）。
         """
         # 将时间字符串转换为datetime objects
@@ -388,6 +394,9 @@ class DynamicDiscussionGraph:
         time_bins = pd.cut(times, bins=bin_edges, right=False)
         bin_counts = time_bins.value_counts().sort_index()
 
+        if verbose:
+            print(colorama.Fore.RED + f"时间单元数量：{len(time_bins)}")
+
         if draw:
             # 绘制折线图和柱状图
             fig, ax = plt.subplots()
@@ -403,7 +412,7 @@ class DynamicDiscussionGraph:
             fig.tight_layout()  # 调整整体空白
             fig.autofmt_xdate()
             plt.xticks(rotation=45)
-            plt.show()
+            plt.show(block=True)
 
         # 返回分箱的起始和结束时间
         return [(bin.left, bin.right) for bin in bin_counts.index]
@@ -463,8 +472,9 @@ class DynamicDiscussionGraph:
         }
 
         for idx, graph in enumerate(self._graphs):
-            current_users = {graph.nodes[node]['user'] for node in graph}
-            current_nodes = set(graph.nodes)
+
+            current_users = {graph.nodes[node]['user'] for node in graph if graph.nodes[node]['type'] != NodeType.ROOT}
+            current_nodes = {node for node in graph if graph.nodes[node]['type'] != NodeType.ROOT}
 
             new_users = current_users - prev_users
             new_nodes = current_nodes - prev_nodes
@@ -486,6 +496,61 @@ class DynamicDiscussionGraph:
         df = df.set_index(['开始时间', '结束时间'])
 
         return df
+
+    def max_nodes_in_a_level(self, index: int = -1) -> int:
+        self._check_graphs()
+
+        graph = self._graphs[index]
+
+        # 检查是否设置了根节点
+        if self._root is None:
+            raise ValueError("Root node is not set.")
+
+        levels = {}  # {node: level}
+        queue = [(self._root, 0)]  # (node, level)
+        while queue:
+            node, level = queue.pop(0)
+            if node not in levels:
+                levels[node] = level
+                neighbors = list(graph[node])
+                for next_node in neighbors:
+                    queue.append((next_node, level + 1))
+
+        # 计算每个层级的节点数量
+        level_counts = {}
+        for level in levels.values():
+            if level in level_counts:
+                level_counts[level] += 1
+            else:
+                level_counts[level] = 1
+
+        # 找到节点数量最多的层级
+        max_nodes_count = max(level_counts.values())
+
+        return max_nodes_count
+
+    def max_depth(self, index: int = -1):
+        self._check_graphs()
+
+        if self._root is None:
+            raise ValueError("Root node is not set.")
+
+        def dfs(node, current_depth):
+            visited.add(node)
+            max_depth = current_depth
+            for neighbor in graph[node]:
+                if neighbor not in visited:
+                    depth = dfs(neighbor, current_depth + 1)
+                    max_depth = max(max_depth, depth)
+            return max_depth
+
+        graph = self._graphs[index]
+
+        visited = set()
+        start_depth = 0
+        ans = dfs(self._root, start_depth)
+
+        return ans
 
     def __getitem__(self, item):
         return self._graphs[item]

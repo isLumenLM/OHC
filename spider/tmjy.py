@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 from io import BytesIO
 from typing import Optional, List, Dict
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import requests
 from PIL import Image
@@ -95,7 +95,7 @@ def user_parse(uid: str, session: requests.Session, delay: Optional[List[int]] =
     if uname:
         uname = uname.replace("【新提醒】", "").split('的个人资料')[0]
 
-    regx = '//div[@class="pbm mbm bbda cl"][last()]/ul/li/em[starts-with(text(),"用户组")]/following-sibling::span/a/font/text()'
+    regx = '//div[@class="pbm mbm bbda cl"][last()]/ul/li/em[starts-with(text(),"用户组")]/following-sibling::span/a//text()'
     group = selector.xpath(regx).get()
 
     regx = '//ul[@id="pbbs"]/li/em[starts-with(text(), "注册时间")]/parent::li/text()'
@@ -215,12 +215,26 @@ def post_parse(pid: int, login_session: requests. Session, delay: Optional[List[
                         'and not(@type="text/javascript") '
                         ']/text()')
                 posttext = ''.join([i.get().strip().replace('\t', ' ') for i in posttext[0].xpath(regx)])
+            else:
+                posttext = ''
 
             regx = '//div[@class="hm ptn"]/span[@class="xi1"][2]/text()'
             replies = selector.xpath(regx).get()
 
             regx = '//div[@id="postlist"]/div[starts-with(@id, "post_")][1]/@id'
             rid = selector.xpath(regx).get().split('_')[1]
+
+            regx = '//div[@id="postlist"]/div[starts-with(@id, "post_")][1]//div[@class="pct"]//img[@id]'
+            imgs = len(selector.xpath(regx))
+
+            netloc_original = urlparse(response.url).netloc
+            regx = '//*[contains(@id,"postmessage")]//a[starts-with(@href, "https") or starts-with(@href, "http")]/@href'
+            hrefs = selector.xpath(regx).get_all()
+            external_links_count = 0
+            for href in hrefs:
+                netloc = urlparse(href).netloc
+                if netloc and netloc != netloc_original:  # 检查域名是否存在且与原始域名不同
+                    external_links_count += 1
 
             user_info = user_parse(uid, login_session, delay)
             posts.append({
@@ -233,6 +247,8 @@ def post_parse(pid: int, login_session: requests. Session, delay: Optional[List[
                 'text': posttext,
                 'floor': 1,
                 'replies': replies,
+                'imgs': imgs,
+                'external_links_count': external_links_count,
                 **user_info
             })
 
@@ -271,7 +287,7 @@ def post_parse(pid: int, login_session: requests. Session, delay: Optional[List[
                 replytime = datetime.strptime(r.xpath(regx).get(), '%Y-%m-%d %H:%M:%S')
 
             regx = './/*[contains(@id, "postmessage")]/text()'
-            text = ''.join([i.get().strip() for i in r.xpath(regx)])
+            text = ''.join([i.get().strip().replace('\t', ' ') for i in r.xpath(regx)])
 
             user_info = user_parse(uid, login_session, delay)
 
