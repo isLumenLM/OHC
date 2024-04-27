@@ -181,7 +181,7 @@ class PostManager(metaclass=abc.ABCMeta):
         features_dict = {
             '偏度值总体平均值': np.average(skewness),
             '发言类型的数量': len({ls_graph.nodes[node]['type'] for node in ls_graph if ls_graph.nodes[node]['type'] != NodeType.ROOT}),
-            '主意个数': len({node for node in ls_graph if ls_graph.nodes[node]['type'] != NodeType.IDEA}),
+            '主意个数': len({node for node in ls_graph if ls_graph.nodes[node]['type'] == NodeType.IDEA}),
             '线程广度': ddg.max_nodes_in_a_level(),
             '线程深度': ddg.max_depth(),
             '载体丰富度': self.posts[0].get('imgs') + self.posts[0].get('external_links_count'),

@@ -395,7 +395,7 @@ class DynamicDiscussionGraph:
         bin_counts = time_bins.value_counts().sort_index()
 
         if verbose:
-            print(colorama.Fore.RED + f"时间单元数量：{len(time_bins)}")
+            print(colorama.Fore.RED + f"时间单元数量：{len(bin_counts)}")
 
         if draw:
             # 绘制折线图和柱状图
