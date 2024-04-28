@@ -133,7 +133,7 @@ class PostManager(metaclass=abc.ABCMeta):
         print("例如，以25天进行分箱，时间粒度输入D，周期输入25")
         print("请确定已经标注好数据")
         print(f"并将已经标注的数据放入{os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+labeled.json')}")
-        granularity = input("请输入时间粒度（'H', 'D', 'W', 'M', 'Y'）：")
+        granularity = input("请输入时间粒度（'H', 'D', 'W', 'M', 'Y'）：").upper()
         number = int(input("请输入周期（正整数）："))
         ddg = DynamicDiscussionGraph()
         ddg.load_graphs_from_json(
@@ -189,6 +189,8 @@ class PostManager(metaclass=abc.ABCMeta):
             '最后一条评论时间': self.posts[-1].get('replytime'),
             '发帖者发表主题数': self.posts[0].get('posts'),
             '发帖者回帖数': self.posts[0].get('replys'),
+            '有效回复数': ddg.number_of_nodes() - 1,
+            '发帖者等级': self._convert_user_weight(self.posts[0].get('group'))
         }
         pd.DataFrame([features_dict]).to_csv(
             os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+features+{number}{granularity}.csv'),

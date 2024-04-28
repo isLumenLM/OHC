@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlparse
 import requests
 from PIL import Image
 from lxml import etree
+from urlextract import URLExtract
 
 from spider.untils import headers
 from spider.untils.requester import get
@@ -227,14 +228,16 @@ def post_parse(pid: int, login_session: requests. Session, delay: Optional[List[
             regx = '//div[@id="postlist"]/div[starts-with(@id, "post_")][1]//div[@class="pct"]//img[@id]'
             imgs = len(selector.xpath(regx))
 
-            netloc_original = urlparse(response.url).netloc
-            regx = '//*[contains(@id,"postmessage")]//a[starts-with(@href, "https") or starts-with(@href, "http")]/@href'
-            hrefs = selector.xpath(regx).get_all()
-            external_links_count = 0
-            for href in hrefs:
-                netloc = urlparse(href).netloc
-                if netloc and netloc != netloc_original:  # 检查域名是否存在且与原始域名不同
-                    external_links_count += 1
+            # netloc_original = urlparse(response.url).netloc
+            # regx = '//*[contains(@id,"postmessage")]//a[starts-with(@href, "https") or starts-with(@href, "http")]/@href'
+            # hrefs = selector.xpath(regx).get_all()
+            # external_links_count = 0
+            # for href in hrefs:
+            #     netloc = urlparse(href).netloc
+            #     if netloc and netloc != netloc_original:  # 检查域名是否存在且与原始域名不同
+            #         external_links_count += 1
+            extractor = URLExtract()
+            external_links_count = len(extractor.find_urls(posttext))
 
             user_info = user_parse(uid, login_session, delay)
             posts.append({
