@@ -177,6 +177,8 @@ class PostManager(metaclass=abc.ABCMeta):
 
         ls_graph = ddg.graphs[-1]
         features_dict = {
+            '有效回复数': ddg.number_of_nodes() - 1,
+            '发帖者等级': self._convert_user_weight(self.posts[0].get('group')),
             '偏度值总体平均值': np.average(skewness),
             '发言类型的数量': len({ls_graph.nodes[node]['type'] for node in ls_graph if ls_graph.nodes[node]['type'] != NodeType.ROOT}),
             '主意个数': len({node for node in ls_graph if ls_graph.nodes[node]['type'] == NodeType.IDEA}),
@@ -187,8 +189,6 @@ class PostManager(metaclass=abc.ABCMeta):
             '最后一条评论时间': self.posts[-1].get('replytime'),
             '发帖者发表主题数': self.posts[0].get('posts'),
             '发帖者回帖数': self.posts[0].get('replys'),
-            '有效回复数': ddg.number_of_nodes() - 1,
-            '发帖者等级': self._convert_user_weight(self.posts[0].get('group'))
         }
         pd.DataFrame([features_dict]).to_csv(
             os.path.join(self.work_path, f'{self.idx}+{self.pid}/{self.idx}+{self.pid}+features+{number}{granularity}.csv'),

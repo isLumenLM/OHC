@@ -31,13 +31,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\script\data\tmjy\1+389727634454528\1+389727634454528+skewness.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\script\data\tmjy\1+389727634454528\1+389727634454528+source.csv">
           <value>
             <Attribute>
@@ -74,20 +67,6 @@
           </value>
         </entry>
         <entry key="\script\data\tmjy\14+270486943682560\14+270486943682560+source.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="&#9;" />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\script\data\tmjy\2+391320139028480\2+391320139028480+source.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="&#9;" />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\script\data\tmjy\389727634454528\389727634454528.csv">
           <value>
             <Attribute>
               <option name="separator" value="&#9;" />
