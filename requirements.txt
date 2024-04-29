@@ -7,3 +7,4 @@ numpy~=1.24.3
 networkx~=3.1
 matplotlib~=3.7.5
 colorama~=0.4.6
+urlextract~=1.9.0

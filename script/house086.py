@@ -6,8 +6,9 @@ import json
 import time
 
 from script.utils import read_json, wrap_text
-from spider.house086 import post_parse
+
 from consensus.graph import DynamicDiscussionGraph
+from spider.house086 import post_parse
 
 pid = 47513
 

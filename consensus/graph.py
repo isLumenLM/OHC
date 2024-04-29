@@ -5,16 +5,16 @@
 import json
 import math
 from collections import defaultdict
+from datetime import datetime
 from enum import Enum
 from typing import List, Tuple, Union, Optional, Dict
-from datetime import datetime
 
 import colorama
+import matplotlib as mpl
+import networkx as nx
 import numpy as np
 import pandas as pd
-import networkx as nx
 from matplotlib import pyplot as plt
-import matplotlib as mpl
 
 mpl.rcParams['font.sans-serif'] = ['SimHei']
 mpl.rcParams['axes.unicode_minus'] = False

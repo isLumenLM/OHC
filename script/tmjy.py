@@ -3,9 +3,9 @@
 # @Author  : Lumen
 # @File    : tmjy.py
 
+import sys
 from configparser import ConfigParser
 
-import sys
 sys.path.append('..')
 from script.manager import PostManager
 from spider.tmjy import post_parse, login

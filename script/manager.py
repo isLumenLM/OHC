@@ -6,17 +6,15 @@ import abc
 import json
 import os
 import pickle
+import sys
 import time
 import webbrowser
 from pprint import pprint
 from typing import Dict, List, Optional
 
+import colorama
 import numpy as np
 import pandas as pd
-import colorama
-
-import sys
-
 import requests
 
 sys.path.append('..')

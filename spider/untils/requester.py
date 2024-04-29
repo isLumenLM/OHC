@@ -2,9 +2,9 @@
 # @Time    : 2022/7/18 11:18
 # @Author  : Lumen
 # @File    : http.py
-from typing import Dict, Optional, List
-import time
 import random
+import time
+from typing import Dict, Optional, List
 
 import requests
 from requests.models import Request, Response

@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 from io import BytesIO
 from typing import Optional, List, Dict
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs
 
 import requests
 from PIL import Image
