@@ -225,7 +225,7 @@ class DynamicDiscussionGraph:
                 raise ValueError("标注有错误，请检查")
 
             # 如果是分裂的节点 再分配一个id
-            if node_id in unique_nodes:
+            while node_id in unique_nodes:
                 node_id = node_id + '_1'
             unique_nodes.add(node_id)
 
@@ -360,7 +360,7 @@ class DynamicDiscussionGraph:
         """
         对时间列表进行分箱。
         :param time_list: 时间字符串的列表。
-        :param granularity: 分箱的粒度，可以是'H', 'D', 'W', 'M', 或 'Y'。
+        :param granularity: 分箱的粒度，可以是'T', 'H', 'D', 'W', 'M', 或 'Y'。
         :param number: 分箱的数量。
         :param draw: 是否画图。
         :param verbose: 是否输出时间单元数
@@ -370,7 +370,9 @@ class DynamicDiscussionGraph:
         times = pd.to_datetime(time_list)
 
         # 根据粒度设置时间偏移
-        if granularity.upper() == 'H':
+        if granularity.upper() == 'T':
+            offset = pd.DateOffset(minutes=number)
+        elif granularity.upper() == 'H':
             offset = pd.DateOffset(hours=number)
         elif granularity.upper() == 'D':
             offset = pd.DateOffset(days=number)
@@ -381,7 +383,7 @@ class DynamicDiscussionGraph:
         elif granularity.upper() == 'Y':
             offset = pd.DateOffset(years=number)
         else:
-            raise ValueError("Granularity must be 'H', 'D', 'W', 'M', or 'Y'.")
+            raise ValueError("Granularity must be 'T', 'H', 'D', 'W', 'M', or 'Y'.")
 
         # 创建分箱的起始时间列表
         start_time = times.min()
