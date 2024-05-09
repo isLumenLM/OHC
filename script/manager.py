@@ -258,7 +258,7 @@ class PostManager(metaclass=abc.ABCMeta):
                     'id': str(post.get('rid')),
                     'created': int(time.time() * 1000),
                     'text': (f"【rid】：{post.get('rid')}\n"
-                             f"【标题】：{post.get('title')}"
+                             f"【标题】：{post.get('title')}\n"
                              f"【时间】：{post.get('replytime')}\n"
                              f"【作者】：{post.get('uname')}\n"
                              f"【用户组】：{post.get('group')}\n"

@@ -101,7 +101,7 @@ class DynamicDiscussionGraph:
                                   for src, dst, edge_type in edges
                                   if src in valid_nodes_at_timestamp and dst in valid_nodes_at_timestamp]
 
-            if nodes_at_timestamp and edges_at_timestamp:
+            if nodes_at_timestamp:
                 self._add_graph(start_time, nodes_at_timestamp, edges_at_timestamp)
 
     def _add_graph(self,

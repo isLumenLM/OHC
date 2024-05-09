@@ -3,6 +3,13 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
+        <entry key="C:\Users\Administrator\Documents\WeChat Files\liumingvipp\FileStorage\File\2024-05\895+1164122+source.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="&#9;" />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\script\data\tmjy\1+389727634454528\1+389727634454528+consensus+1D.csv">
           <value>
             <Attribute>
@@ -168,6 +175,27 @@
           <value>
             <Attribute>
               <option name="separator" value="&#9;" />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\895+1164122\895+1164122+consensus+2H.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\895+1164122\895+1164122+skewness+1H.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\script\data\tmjy\895+1164122\895+1164122+source.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
