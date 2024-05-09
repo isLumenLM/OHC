@@ -104,6 +104,9 @@ class DynamicDiscussionGraph:
             if nodes_at_timestamp:
                 self._add_graph(start_time, nodes_at_timestamp, edges_at_timestamp)
 
+        if len(self._graphs) != len(self._time_bins):
+            raise ValueError("not enough graphs")
+
     def _add_graph(self,
                    timestamp: datetime,
                    nodes: List[Tuple[str, NodeType, Union[datetime, str], str, int, str]],
