@@ -261,6 +261,12 @@ def post_parse(pid: int, login_session: requests. Session, delay: Optional[List[
             if page == 1 and i == 0:
                 continue
 
+            # 是否被禁言
+            regx = './/td[@class="plc"]/div[@class="pct"]/div[@class="pcb"]/div[@class="locked"]'
+            is_locked = r.xpath(regx).get()
+            if is_locked:
+                continue
+
             regx = './/td[@class="plc"]/div[@class="pi"]/strong/a/em/text()'
             floor = r.xpath(regx).get()
             if not floor:
