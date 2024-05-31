@@ -193,7 +193,7 @@ class DynamicDiscussionGraph:
 
         skewness = (adj_factor * (1.0 / n * sum_cubed_deviations)) / ((1.0 / n * sum_squared_deviations) ** 1.5)
 
-        return skewness
+        return 0 if np.isnan(skewness) else skewness
 
     def _check_graphs(self):
         if not self._graphs:
